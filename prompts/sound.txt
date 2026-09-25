@@ -1,0 +1,59 @@
+You are a Flutter audio specialist working with flame_audio.
+Verify and complete the sound integration in the Snake game.
+
+## Package: flame_audio ^2.10.0
+
+## Required Sound Events
+| Event            | File                  | Trigger                              |
+|------------------|-----------------------|--------------------------------------|
+| Background music | bg_music.mp3          | Loop during gameplay, stop on pause  |
+| Eat apple        | eat_apple.mp3         | Every time apple is eaten            |
+| Level complete   | level_complete.mp3    | 30 apples reached                    |
+| Game over        | game_over.mp3         | Collision or timeout                 |
+| Button tap       | button_tap.mp3        | Any menu/UI button pressed           |
+
+## SoundService Requirements
+```dart
+class SoundService extends GetxService {
+  // Background music: use FlameAudio.bgm
+  Future<void> playBgMusic() async => FlameAudio.bgm.play('bg_music.mp3', volume: 0.4);
+  Future<void> stopBgMusic() async => FlameAudio.bgm.stop();
+  Future<void> pauseBgMusic() async => FlameAudio.bgm.pause();
+  Future<void> resumeBgMusic() async => FlameAudio.bgm.resume();
+
+  // Sound effects: use FlameAudio.play
+  Future<void> playEatApple() async => FlameAudio.play('eat_apple.mp3', volume: 0.8);
+  Future<void> playLevelComplete() async => FlameAudio.play('level_complete.mp3');
+  Future<void> playGameOver() async => FlameAudio.play('game_over.mp3');
+  Future<void> playButtonTap() async => FlameAudio.play('button_tap.mp3', volume: 0.5);
+}
+```
+
+## pubspec.yaml assets section
+```yaml
+flutter:
+  assets:
+    - assets/audio/bg_music.mp3
+    - assets/audio/eat_apple.mp3
+    - assets/audio/level_complete.mp3
+    - assets/audio/game_over.mp3
+    - assets/audio/button_tap.mp3
+```
+
+## Your Tasks
+1. Verify SoundService is implemented correctly using flame_audio
+2. Check all sound triggers exist in the right places:
+   - eat_apple → in SnakeGame when head hits apple
+   - level_complete → in GameController when applesEaten >= 30
+   - game_over → in SnakeGame on collision
+   - button_tap → on every GetX navigation call in menu/level screens
+   - bg_music → starts in GameView initState, pauses/resumes on pause
+3. Fix any issues directly in the relevant files
+4. Verify pubspec.yaml has correct assets declared
+
+## Output
+- List what was correct
+- List what was fixed and why
+- Final reminder checklist for developer:
+  * Add actual .mp3 files to assets/audio/ folder
+  * Suggested free sources: freesound.org, mixkit.co, pixabay.com/music

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "559959767324",
+    "project_id": "codeara-apps",
+    "storage_bucket": "codeara-apps.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:559959767324:android:e7498347eec8a21eafe2d9",
+        "android_client_info": {
+          "package_name": "com.codeara.snakeara"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAk9T2Zyc9Dit9Yds7RTGhnau57T4vm11c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

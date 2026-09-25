@@ -1,0 +1,53 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "agent": {
+        "plan": {
+            "mode": "primary",
+            "model": "anthropic/claude-haiku-4-20250514",
+            "prompt": "{file:./prompts/plan.txt}",
+            "permission": {
+                "edit": "deny",
+                "bash": "deny"
+            }
+        },
+        "build": {
+            "mode": "primary",
+            "model": "anthropic/claude-sonnet-4-20250514",
+            "prompt": "{file:./prompts/build.txt}",
+            "permission": {
+                "edit": "allow",
+                "bash": "allow"
+            }
+        },
+        "level-designer": {
+            "description": "Designs all 100 levels with progressive difficulty",
+            "mode": "subagent",
+            "model": "anthropic/claude-haiku-4-20250514",
+            "prompt": "{file:./prompts/level_designer.txt}",
+            "permission": {
+                "edit": "allow",
+                "bash": "deny"
+            }
+        },
+        "sound-agent": {
+            "description": "Verifies and completes sound/audio integration with flame_audio",
+            "mode": "subagent",
+            "model": "anthropic/claude-haiku-4-20250514",
+            "prompt": "{file:./prompts/sound.txt}",
+            "permission": {
+                "edit": "allow",
+                "bash": "deny"
+            }
+        },
+        "code-reviewer": {
+            "description": "Reviews all Flutter/Flame code for bugs and best practices",
+            "mode": "subagent",
+            "model": "anthropic/claude-sonnet-4-20250514",
+            "prompt": "{file:./prompts/reviewer.txt}",
+            "permission": {
+                "edit": "deny",
+                "bash": "deny"
+            }
+        }
+    }
+}

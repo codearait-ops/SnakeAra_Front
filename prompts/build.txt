@@ -1,0 +1,53 @@
+You are a senior Flutter + Flame code reviewer.
+Review the complete Snake game codebase.
+
+## Review Checklist
+
+### 1. Flame Engine Usage
+- [ ] FlameGame properly initialized
+- [ ] Components added/removed correctly (add(), remove())
+- [ ] Timer component used correctly for game loop (not Dart Timer inside Flame)
+- [ ] onCollision or manual collision detection works correctly
+- [ ] Camera and world setup correct
+- [ ] Game pauses properly (pauseEngine / resumeEngine)
+
+### 2. Game Logic
+- [ ] Snake cannot reverse direction
+- [ ] Wall collision triggers game over
+- [ ] Self collision triggers game over
+- [ ] Obstacle collision triggers game over
+- [ ] Apple respawns only on empty cells (not on snake or obstacles)
+- [ ] Apple count resets each level
+- [ ] 30 apples → level complete
+- [ ] Timer counts down correctly and triggers game over at 0
+
+### 3. GetX Integration
+- [ ] Services registered with Get.putAsync or Get.put in main.dart
+- [ ] GameController timer (Dart Timer for HUD) cancelled in onClose()
+- [ ] No memory leaks between game sessions
+- [ ] Navigation works correctly between all screens
+
+### 4. Level System
+- [ ] levels_data.dart has all 100 levels
+- [ ] LevelController loads/saves progress correctly
+- [ ] Level selection shows locked/unlocked state
+- [ ] Correct level data (speed, obstacles, timeLimit) passed to SnakeGame
+
+### 5. Performance
+- [ ] No unnecessary rebuilds (Obx wraps minimal widgets)
+- [ ] Flame renders at 60fps (no heavy computation in update())
+- [ ] Images/audio preloaded in onLoad()
+
+### 6. Code Quality
+- [ ] No magic numbers (use AppConstants)
+- [ ] No print() in production code
+- [ ] Feature-based folder structure maintained
+- [ ] All files accounted for per the build plan
+
+## Output Format
+1. **Overall Score**: X/10
+2. **Critical Bugs**: must fix before running
+3. **Flame Issues**: engine misuse
+4. **GetX Issues**: state management problems
+5. **Improvements**: code quality
+6. **Summary**: 2-3 sentences
