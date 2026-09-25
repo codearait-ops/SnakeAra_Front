@@ -413,6 +413,9 @@ class ApiService extends GetxService {
           'verification_token': verificationToken,
       };
 
+      debugPrint('--- [ApiService] submitScore OUTGOING PAYLOAD ---');
+      debugPrint('📦 Payload: $payload');
+
       final options = Options(
         headers: {
           'Authorization': 'Bearer $token',
@@ -498,6 +501,11 @@ class ApiService extends GetxService {
       );
     } on DioException catch (e) {
       final status = e.response?.statusCode;
+      if (status == 422) {
+        debugPrint('🚨 [ApiService] 422 response body: ${e.response?.data}');
+      } else {
+        debugPrint('[ApiService] submitScore DioException ($status): ${e.message}, data: ${e.response?.data}');
+      }
       if (status == 403 && e.response?.data != null) {
         final data = e.response!.data;
         return SubmitScoreResponse(

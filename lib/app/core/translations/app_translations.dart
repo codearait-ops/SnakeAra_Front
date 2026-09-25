@@ -375,6 +375,10 @@ A little snake has entered the magical garden! The garden is filled with delicio
       'english': 'English 🇺🇸',
       'persian': 'فارسی 🇮🇷',
       'about_system': 'ABOUT & SYSTEM',
+      'developer_info': 'Developer & Studio',
+      'developed_by': 'Developed by CodeAra Team',
+      'company_name': 'CodeAra',
+      'all_rights_reserved': '© 2026 CodeAra. All rights reserved.',
 
       // Leaderboard Screen
       'global_league': 'GLOBAL LEADERBOARDS',
@@ -1173,6 +1177,10 @@ A little snake has entered the magical garden! The garden is filled with delicio
       'english': 'English 🇺🇸',
       'persian': 'فارسی 🇮🇷',
       'about_system': 'درباره بازی و سیستم',
+      'developer_info': 'توسعه‌دهنده و استودیو',
+      'developed_by': 'توسعه یافته توسط تیم CodeAra',
+      'company_name': 'CodeAra',
+      'all_rights_reserved': '© ۲۰۲۶ تمامی حقوق متعلق به CodeAra است.',
 
       // Leaderboard Screen
       'global_league': 'جدول رتبه‌بندی جهانی',

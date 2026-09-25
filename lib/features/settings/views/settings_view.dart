@@ -130,6 +130,8 @@ class SettingsView extends StatelessWidget {
               icon: Icons.info_outline_rounded,
               trailingText: 'v1.0.0',
             ),
+            const SizedBox(height: 24),
+            _buildCompanyFooter(),
           ],
         ),
       ),
@@ -950,23 +952,33 @@ class SettingsView extends StatelessWidget {
     required String subtitle,
     required IconData icon,
     required String trailingText,
+    Color? accentColor,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF21262D)),
+        border: Border.all(
+          color: accentColor != null
+              ? accentColor.withValues(alpha: 0.3)
+              : const Color(0xFF21262D),
+        ),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: (accentColor ?? Colors.white)
+                  .withValues(alpha: accentColor != null ? 0.12 : 0.05),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: Colors.white70, size: 20),
+            child: Icon(
+              icon,
+              color: accentColor ?? Colors.white70,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -992,19 +1004,98 @@ class SettingsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: (accentColor ?? Colors.white)
+                  .withValues(alpha: accentColor != null ? 0.12 : 0.05),
               borderRadius: BorderRadius.circular(10),
+              border: accentColor != null
+                  ? Border.all(color: accentColor.withValues(alpha: 0.3))
+                  : null,
             ),
             child: Text(
               trailingText,
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: accentColor ?? Colors.white70,
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
+                letterSpacing: accentColor != null ? 0.5 : 0,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCompanyFooter() {
+    final fullText = 'all_rights_reserved'.tr;
+    const target = 'CodeAra';
+
+    if (!fullText.contains(target)) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          child: Text(
+            fullText,
+            style: const TextStyle(
+              color: Colors.white38,
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final parts = fullText.split(target);
+    final before = parts.first;
+    final after = parts.sublist(1).join(target);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12.0),
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: before,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: ShaderMask(
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [kPrimaryColor, Color(0xFF00E5FF)],
+                    ).createShader(bounds),
+                    child: const Text(
+                      'CodeAra',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              TextSpan(
+                text: after,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
