@@ -36,6 +36,11 @@ import '../modes/base_game_mode_handler.dart';
 import '../modes/level_mode_handler.dart';
 import '../modes/classic_mode_handler.dart';
 import '../modes/casual_mode_handler.dart';
+import '../modes/laser_mode_handler.dart';
+import '../modes/meltdown_mode_handler.dart';
+import '../modes/crab_chase_handler.dart';
+import '../modes/infection_mode_handler.dart';
+import '../modes/blind_memory_handler.dart';
 
 /// The core Flame game engine for Snake.
 ///
@@ -168,6 +173,63 @@ class SnakeGame extends FlameGame {
     }
   }
 
+  void logLaserSpawned({
+    required int row,
+    required int col,
+    required double warningDuration,
+  }) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('laser_spawned', {
+        'row': row,
+        'col': col,
+        'warning_duration': warningDuration,
+        'score_at_time': score.value,
+      });
+    }
+  }
+
+  void logCraterSpawned({required int row, required int col}) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('crater_spawned', {
+        'row': row,
+        'col': col,
+        'score_at_time': score.value,
+      });
+    }
+  }
+
+  void logInfectionTick({
+    required double infectionRatio,
+    required double currentInterval,
+    required int snakeLength,
+  }) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('infection_tick', {
+        'infection_ratio': infectionRatio,
+        'tick_interval_sec': currentInterval,
+        'snake_length': snakeLength,
+      });
+    }
+  }
+
+  void logParasiteAttached(int elapsedSec) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('parasite_attached', {
+        'elapsed_sec': elapsedSec,
+        'snake_length': snake.segments.length,
+      });
+    }
+  }
+
+  void logThunderstormTriggered(double durationSec) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('thunderstorm_triggered', {
+        'duration_sec': durationSec,
+        'score_at_time': score.value,
+      });
+    }
+  }
+
   // --- Dynamic Grid Dimensions (Square 20x20) ---
   int _gridCols = kGridSize;
   int _gridRows = kGridSize;
@@ -182,7 +244,7 @@ class SnakeGame extends FlameGame {
   // --- Rendering Pipeline Delegation ---
   late final SnakeCanvasRenderer _canvasRenderer = SnakeCanvasRenderer(this);
 
-  // --- Read-only accessors for SnakeCanvasRenderer ---
+  // --- Read-only accessors for SnakeCanvasRenderer and Mode Handlers ---
   int get gridCols => _gridCols;
   int get gridRows => _gridRows;
   double get cellSize => _cellSize;
@@ -191,13 +253,40 @@ class SnakeGame extends FlameGame {
   double get gameTime => _gameTime;
   double get effectiveMoveInterval => _effectiveMoveInterval;
   double get moveAccumulator => _moveAccumulator;
-  ParasiteWorm? get parasite => _parasite;
-  bool get parasiteAttached => _parasiteAttached;
-  double get meltdownAppleTimer => _meltdownAppleTimer;
-  double get meltdownMaxTimer => _meltdownMaxTimer;
-  List<RainDrop> get rainDrops => _rainDrops;
-  List<List<Offset>> get lightningBranches => _lightningBranches;
-  double get flashTimer => _flashTimer;
+  int get elapsedTimeInSeconds => _elapsedTime;
+  Offset getSnakeTailWorldPos() => _getSnakeTailWorldPos();
+
+  ParasiteWorm? get parasite =>
+      (_modeHandler is InfectionModeHandler)
+          ? (_modeHandler as InfectionModeHandler).parasite
+          : null;
+  bool get parasiteAttached =>
+      (_modeHandler is InfectionModeHandler)
+          ? (_modeHandler as InfectionModeHandler).parasiteAttached
+          : false;
+
+  double get meltdownAppleTimer =>
+      (_modeHandler is MeltdownModeHandler)
+          ? (_modeHandler as MeltdownModeHandler).appleTimer
+          : 5.0;
+  double get meltdownMaxTimer => MeltdownModeHandler.maxTimer;
+  List<ExplosionEffect> get explosions =>
+      (_modeHandler is MeltdownModeHandler)
+          ? (_modeHandler as MeltdownModeHandler).explosions
+          : const [];
+
+  List<RainDrop> get rainDrops =>
+      (_modeHandler is BlindMemoryHandler)
+          ? (_modeHandler as BlindMemoryHandler).rainDrops
+          : const [];
+  List<List<Offset>> get lightningBranches =>
+      (_modeHandler is BlindMemoryHandler)
+          ? (_modeHandler as BlindMemoryHandler).lightningBranches
+          : const [];
+  double get flashTimer =>
+      (_modeHandler is BlindMemoryHandler)
+          ? (_modeHandler as BlindMemoryHandler).flashTimer
+          : 0.0;
 
   // --- Continuous game time accumulator (replaces DateTime.now() in hot render paths) ---
   double _gameTime = 0.0;
@@ -299,50 +388,23 @@ class SnakeGame extends FlameGame {
 
   // --- Infection Mode state ---
   final RxDouble infectionRatio = 0.0.obs;
-  double _infectionTimer = 0.0;
-  double _heartbeatTimer = 0.0;
-  double _infectionInterval = 3.5;
-  double _parasiteIntroTimer = 0.0;
-  bool _parasiteAttached = false;
-  ParasiteWorm? _parasite;
 
   // --- Blind Memory / Storm Mode state ---
   final RxDouble memoryBodyOpacity = 1.0.obs;
   final RxBool isFlashActive = false.obs;
-  double _flashTimer = 0.0;
-  double _thunderPreTimer = 0.0;
-  int _lastFlashIntervalIndex = 0;
-  final List<RainDrop> _rainDrops = [];
-  final List<List<Offset>> _lightningBranches = [];
-  final Random _rainRand = Random();
 
-  // --- Boss Battles state ---
+  // --- Boss Battles & Laser Mode state ---
   final RxBool isBossLevelRx = false.obs;
   final RxString bossNameKey = ''.obs;
-
   final RxInt warningLaserRow = (-1).obs;
   final RxInt warningLaserCol = (-1).obs;
   final RxInt activeLaserRow = (-1).obs;
   final RxInt activeLaserCol = (-1).obs;
-  double _laserTimer = 0.0;
-
   final RxDouble shockwaveRadius = (-1.0).obs;
-
   final List<BossBullet> bullets = [];
-
-  // --- Meltdown Mode ---
-  double _meltdownAppleTimer = 5.0;
-  int _meltdownExplosions = 0;
-  final double _meltdownMaxTimer = 5.0;
-  bool _meltdownBonusAwarded = false;
-  final List<ExplosionEffect> explosions = [];
 
   final List<SlicedParticle> slicedParticles = [];
   final List<FloatingTextParticle> floatingTexts = [];
-
-  // --- Crab Chase Mode ---
-  double _crabChaseTimer = 0.0;
-  int _lastDifficultyStage = 0;
 
   // --- Accumulator-based movement ---
   double _moveAccumulator = 0;
@@ -350,9 +412,6 @@ class SnakeGame extends FlameGame {
   // --- Timer state ---
   int _timeRemaining = 120;
   Timer? _gameTimer;
-  Timer? _laserActiveTimer;
-  Timer? _laserClearTimer;
-  Timer? _shockwavePeriodicTimer;
   Timer? _shakeTimer;
 
   // --- Reactive state (GetX) ---
@@ -533,104 +592,6 @@ class SnakeGame extends FlameGame {
     }
   }
 
-  void _initRainDrops() {
-    _rainDrops.clear();
-    for (int i = 0; i < 50; i++) {
-      _rainDrops.add(
-        RainDrop(
-          x: _rainRand.nextDouble(),
-          y: _rainRand.nextDouble(),
-          speed: 1.2 + _rainRand.nextDouble() * 0.9,
-          length: 10.0 + _rainRand.nextDouble() * 12.0,
-          alpha: 0.12 + _rainRand.nextDouble() * 0.38,
-        ),
-      );
-    }
-  }
-
-  void _updateRain(double dt) {
-    if (gameMode.value != GameMode.blindMemory) return;
-    if (_rainDrops.isEmpty) _initRainDrops();
-
-    for (final drop in _rainDrops) {
-      drop.y += drop.speed * dt * 2.8;
-      drop.x -= drop.speed * dt * 0.6;
-      if (drop.y > 1.0) {
-        drop.y = -0.05;
-        drop.x = _rainRand.nextDouble() + 0.15;
-      }
-      if (drop.x < 0.0) {
-        drop.x = 1.0;
-      }
-    }
-  }
-
-  void _generateLightningBolts() {
-    _lightningBranches.clear();
-    final boardW = _gridCols * _cellSize;
-    final boardH = _gridRows * _cellSize;
-    final rand = Random();
-
-    // 1-2 main lightning strikes from sky/top of board down
-    final strikeCount = 1 + rand.nextInt(2);
-    for (int s = 0; s < strikeCount; s++) {
-      final startX = _offsetX + boardW * (0.2 + rand.nextDouble() * 0.6);
-      final startY = _offsetY;
-      final targetX = startX + (rand.nextDouble() - 0.5) * boardW * 0.45;
-      final targetY = _offsetY + boardH * (0.65 + rand.nextDouble() * 0.35);
-
-      _createLightningBranch(
-        Offset(startX, startY),
-        Offset(targetX, targetY),
-        displace: boardW * 0.16,
-        depth: 0,
-      );
-    }
-  }
-
-  void _createLightningBranch(
-    Offset p1,
-    Offset p2, {
-    required double displace,
-    required int depth,
-  }) {
-    if (depth >= 5 || displace < 3.0) {
-      _lightningBranches.add([p1, p2]);
-      return;
-    }
-
-    final rand = Random();
-    final midX = (p1.dx + p2.dx) / 2 + (rand.nextDouble() - 0.5) * displace;
-    final midY =
-        (p1.dy + p2.dy) / 2 + (rand.nextDouble() - 0.2) * (displace * 0.4);
-    final mid = Offset(midX, midY);
-
-    _createLightningBranch(
-      p1,
-      mid,
-      displace: displace * 0.55,
-      depth: depth + 1,
-    );
-    _createLightningBranch(
-      mid,
-      p2,
-      displace: displace * 0.55,
-      depth: depth + 1,
-    );
-
-    // Random split branch (forking bolt)
-    if (rand.nextDouble() < 0.35 && depth < 3) {
-      final forkEndX = midX + (rand.nextDouble() - 0.5) * displace * 2.2;
-      final forkEndY = midY + (rand.nextDouble() * 0.7 + 0.3) * (p2.dy - midY);
-      _createLightningBranch(
-        mid,
-        Offset(forkEndX, forkEndY),
-        displace: displace * 0.45,
-        depth: depth + 2,
-      );
-    }
-  }
-
   Future<bool> _startSessionEventLogger(String mode) async {
     final auth = Get.find<AuthController>();
 
@@ -678,9 +639,6 @@ class SnakeGame extends FlameGame {
     _cancelAllTimers();
     _resetAccumulatorTimers();
     gameMode.value = GameMode.classic;
-    final classicHandler = ClassicModeHandler();
-    _modeHandler = classicHandler;
-    classicHandler.onInit(this);
     refreshSkin();
     applesEaten = 0;
     applesCount.value = 0;
@@ -698,9 +656,12 @@ class SnakeGame extends FlameGame {
     pearsCount.value = 0;
     pearScore.value = 0;
 
-    // Load stored classic highscore (Removed)
-
     snake.init(_gridCols, _gridRows);
+
+    final classicHandler = ClassicModeHandler();
+    _modeHandler = classicHandler;
+    classicHandler.onInit(this);
+
     food.spawn(
       _gridCols,
       _gridRows,
@@ -720,9 +681,6 @@ class SnakeGame extends FlameGame {
     _cancelAllTimers();
     _resetAccumulatorTimers();
     gameMode.value = GameMode.casual;
-    final casualHandler = CasualModeHandler();
-    _modeHandler = casualHandler;
-    casualHandler.onInit(this);
     refreshSkin();
     applesEaten = 0;
     applesCount.value = 0;
@@ -742,6 +700,10 @@ class SnakeGame extends FlameGame {
 
     snake.init(_gridCols, _gridRows);
     snake.resetInfection();
+
+    final casualHandler = CasualModeHandler();
+    _modeHandler = casualHandler;
+    casualHandler.onInit(this);
 
     food.spawn(
       _gridCols,
@@ -809,16 +771,11 @@ class SnakeGame extends FlameGame {
     pearsCount.value = 0;
     pearScore.value = 0;
 
-    _infectionInterval = 3.0; // base seconds per tail segment infection
-    _parasiteAttached = false;
-    _parasite = null;
-
-    // Load stored infection highscore (Removed)
-
     snake.init(_gridCols, _gridRows);
-    snake.resetInfection();
-    // Snake starts healthy for the first 5 seconds; worm will attach after 5s
-    infectionRatio.value = 0.0;
+
+    final infectionHandler = InfectionModeHandler();
+    _modeHandler = infectionHandler;
+    infectionHandler.onInit(this);
 
     food.spawn(
       _gridCols,
@@ -856,14 +813,12 @@ class SnakeGame extends FlameGame {
     pearsCount.value = 0;
     pearScore.value = 0;
 
-    memoryBodyOpacity.value = 1.0;
-    isFlashActive.value = false;
-    _lastFlashIntervalIndex = 0;
-    _lightningBranches.clear();
-    _initRainDrops();
-
     snake.init(_gridCols, _gridRows);
     snake.resetInfection();
+
+    final blindHandler = BlindMemoryHandler();
+    _modeHandler = blindHandler;
+    blindHandler.onInit(this);
 
     food.spawn(
       _gridCols,
@@ -901,13 +856,12 @@ class SnakeGame extends FlameGame {
     pearsCount.value = 0;
     pearScore.value = 0;
 
-    _meltdownExplosions = 0;
-    _meltdownBonusAwarded = false;
-    explosions.clear();
-
-    // Load stored meltdown highscore (Removed)
-
     snake.init(_gridCols, _gridRows);
+
+    final meltdownHandler = MeltdownModeHandler();
+    _modeHandler = meltdownHandler;
+    meltdownHandler.onInit(this);
+
     food.spawn(
       _gridCols,
       _gridRows,
@@ -939,7 +893,6 @@ class SnakeGame extends FlameGame {
     _inputQueue.clear();
 
     _speed = 200; // Normal starting speed
-    _lastDifficultyStage = 0;
 
     obstacles.loadFromLevelData([]); // No initial obstacles unless desired
     pear.despawn();
@@ -949,7 +902,9 @@ class SnakeGame extends FlameGame {
     // Start with a standard snake length (3)
     snake.init(_gridCols, _gridRows);
 
-    crab.spawn(_gridCols, _gridRows, snake);
+    final crabHandler = CrabChaseHandler();
+    _modeHandler = crabHandler;
+    crabHandler.onInit(this);
 
     food.spawn(
       _gridCols,
@@ -992,10 +947,12 @@ class SnakeGame extends FlameGame {
     slicedParticles.clear();
     floatingTexts.clear();
 
-    // Load stored laser highscore (Removed)
-
     snake.init(_gridCols, _gridRows);
     snake.resetInfection();
+
+    final laserHandler = LaserModeHandler();
+    _modeHandler = laserHandler;
+    laserHandler.onInit(this);
 
     food.spawn(
       _gridCols,
@@ -1012,10 +969,9 @@ class SnakeGame extends FlameGame {
   }
 
   void _cancelLaserTimers() {
-    _laserActiveTimer?.cancel();
-    _laserActiveTimer = null;
-    _laserClearTimer?.cancel();
-    _laserClearTimer = null;
+    if (_modeHandler is LaserModeHandler) {
+      (_modeHandler as LaserModeHandler).cancelTimers();
+    }
     warningLaserRow.value = -1;
     warningLaserCol.value = -1;
     activeLaserRow.value = -1;
@@ -1038,14 +994,6 @@ class SnakeGame extends FlameGame {
     _modeHandler = null;
     _gameTime = 0.0;
     _canvasRenderer.resetCache();
-    _infectionTimer = 0.0;
-    _heartbeatTimer = 0.0;
-    _parasiteIntroTimer = 0.0;
-    _flashTimer = 0.0;
-    _thunderPreTimer = 0.0;
-    _laserTimer = 0.0;
-    _meltdownAppleTimer = _meltdownMaxTimer;
-    _crabChaseTimer = 0.0;
     _firstTickLogged = false;
   }
 
@@ -1065,9 +1013,6 @@ class SnakeGame extends FlameGame {
     _cancelAllTimers();
     _resetAccumulatorTimers();
     gameMode.value = GameMode.level;
-    final levelHandler = LevelModeHandler();
-    _modeHandler = levelHandler;
-    levelHandler.onInit(this);
     refreshSkin();
     currentLevel = level;
     currentLevelRx.value = level;
@@ -1104,6 +1049,10 @@ class SnakeGame extends FlameGame {
 
     obstacles.loadFromLevelData(levelData['obstacles'] as List<dynamic>);
     snake.init(_gridCols, _gridRows);
+
+    final levelHandler = LevelModeHandler();
+    _modeHandler = levelHandler;
+    levelHandler.onInit(this);
     food.spawn(
       _gridCols,
       _gridRows,
@@ -1151,301 +1100,8 @@ class SnakeGame extends FlameGame {
       }
     }
 
-    // --- Mode Handler Update (e.g. LevelModeHandler) ---
+    // --- Mode Handler Update (e.g. LevelModeHandler, LaserModeHandler, etc.) ---
     _modeHandler?.update(safeDt);
-
-    // --- Crab Chase Mode Update ---
-    if (gameMode.value == GameMode.crabChase) {
-      _crabChaseTimer += safeDt;
-      final int difficultyStage = (_crabChaseTimer / 90.0).floor();
-      if (difficultyStage > _lastDifficultyStage) {
-        _lastDifficultyStage = difficultyStage;
-        crab.speedMultiplier = min(1.6, 1.0 + 0.15 * difficultyStage);
-        sound.playLaserWarning(); // Using laser warning sound for level up
-      }
-
-      crab.update(safeDt, snake, _gridCols, _gridRows);
-
-      // Check for cut timing
-      if (crab.shouldApplyCutThisFrame()) {
-        final hitIndex = crab.lastHitSegmentIndex;
-        if (hitIndex > 0) {
-          // Safety check
-          final cutSegments = snake.sliceAt(hitIndex);
-          if (cutSegments.isNotEmpty) {
-            _onSnakeSliced(cutSegments);
-
-            // Floating text is already added in _onSnakeSliced, but we can override or keep it.
-            // Check minimum snake length
-            if (snake.segments.length < 3) {
-              _gameOver(GameOverReason.crabCollision);
-              return;
-            }
-          }
-        }
-      }
-
-      // Check collision
-      if (!crab.isAttacking) {
-        final hitIndex = crab.checkCollision(snake, _cellSize);
-        if (hitIndex == 0) {
-          // Head collision
-          _gameOver(GameOverReason.crabCollision); // Head hit by crab
-          return;
-        } else if (hitIndex > 0) {
-          // Body collision
-          crab.triggerAttack(hitIndex);
-        }
-      }
-    }
-
-    // --- Laser Mode Mechanics Update ---
-    if (gameMode.value == GameMode.laser) {
-      // Continuous Laser Collision & Slicing Detection (every frame)
-      if (activeLaserRow.value >= 0) {
-        final targetY = activeLaserRow.value;
-        if (snake.head.y == targetY) {
-          _gameOver(GameOverReason.laserHeadHit);
-          return;
-        } else {
-          for (int i = 1; i < snake.segments.length; i++) {
-            if (snake.segments[i].y == targetY) {
-              final cutSegments = snake.sliceAt(i);
-              if (cutSegments.isNotEmpty) {
-                _onSnakeSliced(cutSegments);
-              }
-              break;
-            }
-          }
-        }
-      }
-      if (activeLaserCol.value >= 0) {
-        final targetX = activeLaserCol.value;
-        if (snake.head.x == targetX) {
-          _gameOver(GameOverReason.laserHeadHit);
-          return;
-        } else {
-          for (int i = 1; i < snake.segments.length; i++) {
-            if (snake.segments[i].x == targetX) {
-              final cutSegments = snake.sliceAt(i);
-              if (cutSegments.isNotEmpty) {
-                _onSnakeSliced(cutSegments);
-              }
-              break;
-            }
-          }
-        }
-      }
-
-      _laserTimer += safeDt;
-      const laserSpawnInterval = 5.0; // Spawns every 5 seconds as requested
-
-      if (_laserTimer >= laserSpawnInterval) {
-        _laserTimer = 0.0;
-        final rand = mechanicsRng.boss ?? Random();
-        final isRow = rand.nextBool();
-        final idx = rand.nextInt(18) + 1;
-
-        if (isRow) {
-          warningLaserRow.value = idx;
-          warningLaserCol.value = -1;
-        } else {
-          warningLaserCol.value = idx;
-          warningLaserRow.value = -1;
-        }
-
-        if (gameMode.value == GameMode.laser) {
-          Get.find<GameEventLogger>().logEvent('laser_spawned', {
-            'row': isRow ? idx : -1,
-            'col': isRow ? -1 : idx,
-            'warning_duration': 1.2,
-            'score_at_time': score.value,
-          });
-        }
-
-        sound.playLaserWarning();
-
-        final targetRow = isRow ? idx : -1;
-        final targetCol = isRow ? -1 : idx;
-
-        _laserActiveTimer?.cancel();
-        _laserActiveTimer = Timer(const Duration(milliseconds: 1200), () {
-          _laserActiveTimer = null;
-          if (gameStatus.value != GameStatus.playing) {
-            warningLaserRow.value = -1;
-            warningLaserCol.value = -1;
-            return;
-          }
-          activeLaserRow.value = targetRow;
-          activeLaserCol.value = targetCol;
-          warningLaserRow.value = -1;
-          warningLaserCol.value = -1;
-          sound.playLaserBeam();
-
-          _laserClearTimer?.cancel();
-          _laserClearTimer = Timer(const Duration(milliseconds: 900), () {
-            _laserClearTimer = null;
-            activeLaserRow.value = -1;
-            activeLaserCol.value = -1;
-          });
-        });
-      }
-    }
-
-    // --- Meltdown Mode Update ---
-    if (gameMode.value == GameMode.meltdown) {
-      _meltdownAppleTimer -= safeDt;
-      if (_meltdownAppleTimer <= 0) {
-        _meltdownAppleTimer = _meltdownMaxTimer;
-        _meltdownExplosions++;
-
-        // 1. Instant visual explosion
-        explosions.add(ExplosionEffect(food.position, 0.6, 0.6));
-
-        // 2. Explode! Bypass safety zone so crater is definitely created
-        obstacles.addObstacle(
-          food.position,
-          gridWidth: _gridCols,
-          gridHeight: _gridRows,
-          ignoreSafetyZone: true,
-        );
-
-        Get.find<GameEventLogger>().logEvent('crater_spawned', {
-          'row': food.position.y,
-          'col': food.position.x,
-          'score_at_time': score.value,
-        });
-
-        _triggerShake();
-        sound.playLaserWarning(); // Explosion sound
-        _speed = max(157, 220 - (_meltdownExplosions * 4));
-
-        // 3. Respawn food
-        food.spawn(
-          _gridCols,
-          _gridRows,
-          snake.segments,
-          obstacles.obstacles,
-          mechanicsRng.food ?? Random(),
-        );
-      }
-
-      // Update explosions
-      for (int i = explosions.length - 1; i >= 0; i--) {
-        explosions[i].life -= safeDt;
-        if (explosions[i].life <= 0) {
-          explosions.removeAt(i);
-        }
-      }
-    }
-
-    if (gameMode.value == GameMode.infection) {
-      if (!_parasiteAttached) {
-        _parasiteIntroTimer += safeDt;
-        if (_parasiteIntroTimer >= 5.0 && _parasite == null) {
-          _spawnParasiteWorm();
-        }
-        if (_parasite != null) {
-          _parasite!.update(safeDt, _getSnakeTailWorldPos());
-          if (_parasite!.hasReachedTarget) {
-            _onParasiteAttached();
-          }
-        }
-      } else {
-        _infectionTimer += safeDt;
-
-        // Accelerate snake movement speed smoothly over 100s (190ms down to 110ms)
-        _speed = max(110, 190 - ((_elapsedTime / 100.0) * 80).round());
-
-        // Accelerate infection tick rate smoothly over 100s (3.0s down to 1.0s)
-        final currentInterval = max(
-          1.0,
-          _infectionInterval -
-              ((_elapsedTime - 5.0).clamp(0, 100) / 100.0) * 2.0 -
-              (applesEaten * 0.03),
-        );
-
-        if (_infectionTimer >= currentInterval) {
-          _infectionTimer = 0;
-          snake.infectTail();
-          infectionRatio.value = snake.infectionRatio;
-
-          Get.find<GameEventLogger>().logEvent('infection_tick', {
-            'infection_ratio': snake.infectionRatio,
-            'tick_interval_sec': currentInterval,
-            'snake_length': snake.segments.length,
-          });
-
-          sound.playInfectionPulse();
-
-          if (snake.isHeadInfected) {
-            _gameOver(GameOverReason.infectionReachedHead);
-            return;
-          }
-        }
-
-        if (snake.infectionRatio >= 0.60) {
-          _heartbeatTimer += safeDt;
-          final heartbeatInterval = snake.infectionRatio >= 0.80 ? 0.6 : 1.0;
-          if (_heartbeatTimer >= heartbeatInterval) {
-            _heartbeatTimer = 0;
-            sound.playHeartbeat(volume: (snake.infectionRatio).clamp(0.5, 1.0));
-          }
-        }
-      }
-    } else if (gameMode.value == GameMode.blindMemory) {
-      _updateRain(safeDt);
-
-      // Check thunderstorm audio trigger (every 18s starting at 16s: 16s, 34s, 52s, 70s...)
-      if (_elapsedTime >= 16) {
-        final intervalIndex = (_elapsedTime - 16) ~/ 18;
-        final secondsInInterval = (_elapsedTime - 16) % 18;
-        if (secondsInInterval == 0 && intervalIndex > _lastFlashIntervalIndex) {
-          _lastFlashIntervalIndex = intervalIndex;
-          _thunderPreTimer = 2.0; // Audio plays 2 seconds before visual strike!
-
-          Get.find<GameEventLogger>().logEvent('thunderstorm_triggered', {
-            'duration_sec': 4.8,
-            'score_at_time': score.value,
-          });
-
-          sound.playThunderstorm(); // Sound starts with 2s build-up
-        }
-      }
-
-      // Handle 2-second pre-timer:
-      if (_thunderPreTimer > 0) {
-        _thunderPreTimer -= safeDt;
-        if (_thunderPreTimer <= 0) {
-          // Exactly 2 seconds later -> Visual lightning strike!
-          _flashTimer = 4.2;
-          _generateLightningBolts();
-          isFlashActive.value = true;
-          memoryBodyOpacity.value = 1.0;
-        }
-      }
-
-      if (_flashTimer > 0) {
-        _flashTimer -= safeDt;
-        isFlashActive.value =
-            _flashTimer >
-            3.2; // Screen flash & bolts visible for first 1.0s of visual strike
-        memoryBodyOpacity.value =
-            1.0; // 100% visible luminous body during lightning!
-      } else if (_thunderPreTimer <= 0) {
-        isFlashActive.value = false;
-        // Initial intro fade out from 6s to 8s:
-        if (_elapsedTime < 6) {
-          memoryBodyOpacity.value = 1.0;
-        } else if (_elapsedTime < 8) {
-          final fadeT = (_elapsedTime + safeDt - 6) / 2.0;
-          memoryBodyOpacity.value = (1.0 - fadeT * 0.995).clamp(0.005, 1.0);
-        } else {
-          memoryBodyOpacity.value =
-              0.005; // Stealth ghost echo in the dark rain
-        }
-      }
-    }
 
     final moveInterval = _effectiveMoveInterval;
     _moveAccumulator += safeDt;
@@ -1582,19 +1238,19 @@ class SnakeGame extends FlameGame {
     }
 
     if (gameMode.value == GameMode.meltdown) {
+      final bonusAwarded = (_modeHandler is MeltdownModeHandler)
+          ? (_modeHandler as MeltdownModeHandler).bonusAwarded
+          : false;
       Get.find<GameEventLogger>().logEvent('food_eaten', {
         'score_awarded': scoreAwarded,
         'current_score': score.value,
         'seconds_remaining_on_timer': double.parse(
-          _meltdownAppleTimer.toStringAsFixed(2),
+          meltdownAppleTimer.toStringAsFixed(2),
         ),
-        'bonus_awarded': _meltdownBonusAwarded,
+        'bonus_awarded': bonusAwarded,
         'speed_ms': _speed,
         'snake_length': snake.segments.length,
       });
-
-      // Reset apple timer
-      _meltdownAppleTimer = _meltdownMaxTimer;
     }
 
     if (isDailyMission) {
@@ -1637,45 +1293,8 @@ class SnakeGame extends FlameGame {
     if (customScore != null) {
       addedPoints = customScore.points;
       popupColor = customScore.color;
-    } else if (gameMode.value == GameMode.meltdown) {
-      // Meltdown Mode: Progressive score
-      addedPoints = 10 + (applesEaten - 1) * 5;
-      popupColor = const Color(0xFFC6FF00); // Neon Yellow-Green
-
-      // Last Second Bonus
-      _meltdownBonusAwarded = _meltdownAppleTimer <= 1.0;
-      if (_meltdownBonusAwarded) {
-        final bonus = 50;
-        score.value += bonus;
-        floatingTexts.add(
-          FloatingTextParticle(
-            text: 'perfect_timing_floating'.trParams({'bonus': '$bonus'}),
-            x: food.position.x.toDouble() + 0.5,
-            y: food.position.y.toDouble() - 0.5, // slightly above
-            color: const Color(0xFFC6FF00),
-            vy: -1.0,
-            maxLife: 2.0,
-          ),
-        );
-      }
-    } else if (gameMode.value == GameMode.laser) {
-      // Laser Mode: Escalating progressive score per apple (10, 15, 20, 25...)
-      addedPoints = 10 + (applesEaten - 1) * 5;
-      popupColor = const Color(0xFFFF9100); // Laser Theme Orange
-    } else if (gameMode.value == GameMode.crabChase) {
-      // Crab Chase Mode: Escalating progressive score per apple (same as Laser Mode: 10, 15, 20, 25...)
-      addedPoints = 10 + (applesEaten - 1) * 5;
-      popupColor = const Color(0xFFFF5722); // Crab Chase Deep Orange
-    } else if (gameMode.value == GameMode.blindMemory) {
-      // Blind Memory Mode: 50 points per apple
-      addedPoints = 50;
-      popupColor = const Color(0xFFD500F9); // Blind Memory Theme Purple/Magenta
-    } else if (gameMode.value == GameMode.infection) {
-      // Infection Mode: 10 points per apple
-      addedPoints = 10;
-      popupColor = const Color(0xFFFF1744); // Infection Theme Red
     } else {
-      // Custom Mode
+      // Fallback / Custom Mode
       addedPoints = 10;
       popupColor = const Color(0xFFFFD700); // Custom Theme Gold
     }
@@ -1979,81 +1598,6 @@ class SnakeGame extends FlameGame {
           (count.isEven ? amplitude : -amplitude) * decay * 0.5;
       count++;
     });
-  }
-
-  void _spawnParasiteWorm() {
-    final startSide = Random().nextInt(4);
-    double spawnX = 0;
-    double spawnY = 0;
-    switch (startSide) {
-      case 0: // Top
-        spawnX = _offsetX + Random().nextDouble() * (_gridCols * _cellSize);
-        spawnY = _offsetY - _cellSize * 4;
-        break;
-      case 1: // Right
-        spawnX = _offsetX + _gridCols * _cellSize + _cellSize * 4;
-        spawnY = _offsetY + Random().nextDouble() * (_gridRows * _cellSize);
-        break;
-      case 2: // Bottom
-        spawnX = _offsetX + Random().nextDouble() * (_gridCols * _cellSize);
-        spawnY = _offsetY + _gridRows * _cellSize + _cellSize * 4;
-        break;
-      case 3: // Left
-      default:
-        spawnX = _offsetX - _cellSize * 4;
-        spawnY = _offsetY + Random().nextDouble() * (_gridRows * _cellSize);
-        break;
-    }
-    _parasite = ParasiteWorm(headX: spawnX, headY: spawnY, cellSize: _cellSize);
-  }
-
-  void _onParasiteAttached() {
-    _parasiteAttached = true;
-    snake.infectTail();
-    infectionRatio.value = snake.infectionRatio;
-
-    final tailPos = _getSnakeTailWorldPos();
-
-    // Toxic splash particle burst
-    for (int i = 0; i < 22; i++) {
-      final angle = Random().nextDouble() * 2 * pi;
-      final spd = 60.0 + Random().nextDouble() * 160.0;
-      slicedParticles.add(
-        SlicedParticle(
-          x: tailPos.dx,
-          y: tailPos.dy,
-          vx: cos(angle) * spd,
-          vy: sin(angle) * spd,
-          radius: _cellSize * (0.1 + Random().nextDouble() * 0.15),
-          color: Random().nextBool()
-              ? const Color(0xFF00E676)
-              : const Color(0xFFE040FB),
-          life: 0.0,
-          maxLife: 0.6,
-        ),
-      );
-    }
-
-    _triggerShake();
-    sound.playInfectionPulse();
-
-    floatingTexts.add(
-      FloatingTextParticle(
-        text: 'parasite_attached_floating'.tr,
-        x: (tailPos.dx - _offsetX) / _cellSize,
-        y: (tailPos.dy - _offsetY) / _cellSize - 0.5,
-        color: const Color(0xFF00E676),
-        vy: -1.2,
-        maxLife: 2.0,
-      ),
-    );
-
-    Get.find<GameEventLogger>().logEvent('parasite_attached', {
-      'elapsed_sec': _elapsedTime,
-      'snake_length': snake.segments.length,
-    });
-
-    _parasite = null;
   }
 
   Offset _getSnakeTailWorldPos() {
