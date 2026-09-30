@@ -11,6 +11,7 @@ import '../../game/models/snake_skin.dart';
 import '../../league/controllers/league_controller.dart';
 import '../../shop/views/skin_shop_view.dart';
 import '../controllers/settings_controller.dart';
+import '../widgets/feedback_sheet.dart';
 
 /// Dark neon-styled Settings screen for configuring audio, controls, and app preferences.
 class SettingsView extends StatelessWidget {
@@ -107,7 +108,8 @@ class SettingsView extends StatelessWidget {
 
             // --- Weekend League Section (§1.3) — hidden for guests ---
             Obx(() {
-              final isLoggedIn = Get.isRegistered<AuthController>() &&
+              final isLoggedIn =
+                  Get.isRegistered<AuthController>() &&
                   Get.find<AuthController>().isLoggedIn.value;
               if (!isLoggedIn) return const SizedBox.shrink();
               return Column(
@@ -121,12 +123,29 @@ class SettingsView extends StatelessWidget {
               );
             }),
 
+            // --- Feedback & Support Section ---
+            _buildSectionHeader('feedback_section_title'.tr),
+            const SizedBox(height: 10),
+            _buildActionTile(
+              context: context,
+              title: 'feedback_title'.tr,
+              subtitle: 'feedback_subtitle'.tr,
+              icon: Icons.chat_bubble_outline_rounded,
+              accentColor: kPrimaryColor,
+              onTap: () => FeedbackBottomSheet.show(context),
+            ),
+
+            const SizedBox(height: 28),
+
             // --- About & App Info Section ---
             _buildSectionHeader('about_system'.tr),
             const SizedBox(height: 10),
             _buildInfoCard(
               title: 'app_title'.tr,
-              subtitle: 'Version 1.0.0 • Build 2026.1',
+              subtitle: 'app_version_info'.trParams({
+                'version': '1.0.0',
+                'build': '2026.1',
+              }),
               icon: Icons.info_outline_rounded,
               trailingText: 'v1.0.0',
             ),
@@ -359,7 +378,6 @@ class SettingsView extends StatelessWidget {
     });
   }
 
-
   /// Locked cosmetics placeholder shown when the user is in guest mode.
   Widget _buildLockedCosmeticsCard({
     required String title,
@@ -459,7 +477,6 @@ class SettingsView extends StatelessWidget {
   }) {
     final isGradient = gradientColors != null && gradientColors.isNotEmpty;
 
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: 100,
@@ -509,7 +526,11 @@ class SettingsView extends StatelessWidget {
                   ],
                 ),
                 child: isSelected && isOwned
-                    ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                    ? const Icon(
+                        Icons.check_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      )
                     : null,
               ),
               if (!isOwned)
@@ -598,7 +619,6 @@ class SettingsView extends StatelessWidget {
     );
   }
 
-
   Widget _buildBoardSkinSelector(SettingsController controller) {
     final cosmetics = Get.isRegistered<CosmeticsController>()
         ? Get.find<CosmeticsController>()
@@ -674,8 +694,8 @@ class SettingsView extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final theme = themesList[index];
                     final isOwned = theme.hasAccess;
-                    final isSelected = isOwned &&
-                        (activeKey == theme.themeKey.toLowerCase());
+                    final isSelected =
+                        isOwned && (activeKey == theme.themeKey.toLowerCase());
                     final accentColor = BoardSkins.getAccentColor(
                       theme.themeKey,
                     );
@@ -701,15 +721,15 @@ class SettingsView extends StatelessWidget {
                           color: isSelected
                               ? accentColor.withValues(alpha: 0.15)
                               : (isOwned
-                                  ? const Color(0xFF0D1117)
-                                  : const Color(0xFF080B0F)),
+                                    ? const Color(0xFF0D1117)
+                                    : const Color(0xFF080B0F)),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: isSelected
                                 ? accentColor
                                 : (isOwned
-                                    ? const Color(0xFF30363D)
-                                    : const Color(0xFF21262D)),
+                                      ? const Color(0xFF30363D)
+                                      : const Color(0xFF21262D)),
                             width: isSelected ? 2 : 1,
                           ),
                           boxShadow: isSelected
@@ -743,8 +763,8 @@ class SettingsView extends StatelessWidget {
                                 color: isSelected
                                     ? Colors.white
                                     : (isOwned
-                                        ? Colors.white70
-                                        : Colors.white38),
+                                          ? Colors.white70
+                                          : Colors.white38),
                                 fontSize: 11,
                                 height: 1.2,
                                 fontWeight: isSelected
@@ -760,12 +780,14 @@ class SettingsView extends StatelessWidget {
                                   vertical: 1.5,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFD700)
-                                      .withValues(alpha: 0.12),
+                                  color: const Color(
+                                    0xFFFFD700,
+                                  ).withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: const Color(0xFFFFD700)
-                                        .withValues(alpha: 0.3),
+                                    color: const Color(
+                                      0xFFFFD700,
+                                    ).withValues(alpha: 0.3),
                                     width: 0.8,
                                   ),
                                 ),
@@ -844,9 +866,7 @@ class SettingsView extends StatelessWidget {
         color: const Color(0x35FFFFFF),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isOwned
-              ? accentColor.withValues(alpha: 0.4)
-              : Colors.white12,
+          color: isOwned ? accentColor.withValues(alpha: 0.4) : Colors.white12,
           width: 0.8,
         ),
       ),
@@ -947,6 +967,86 @@ class SettingsView extends StatelessWidget {
     );
   }
 
+  Widget _buildActionTile({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? accentColor,
+  }) {
+    final isRtl =
+        Directionality.of(context) == TextDirection.rtl ||
+        Get.locale?.languageCode == 'fa';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF161B22),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: accentColor != null
+                  ? accentColor.withValues(alpha: 0.3)
+                  : const Color(0xFF21262D),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (accentColor ?? Colors.white).withValues(
+                    alpha: accentColor != null ? 0.15 : 0.05,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: accentColor ?? Colors.white70,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: accentColor?.withValues(alpha: 0.7) ?? Colors.white38,
+                size: 14,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoCard({
     required String title,
     required String subtitle,
@@ -970,15 +1070,12 @@ class SettingsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: (accentColor ?? Colors.white)
-                  .withValues(alpha: accentColor != null ? 0.12 : 0.05),
+              color: (accentColor ?? Colors.white).withValues(
+                alpha: accentColor != null ? 0.12 : 0.05,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: accentColor ?? Colors.white70,
-              size: 20,
-            ),
+            child: Icon(icon, color: accentColor ?? Colors.white70, size: 20),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1004,8 +1101,9 @@ class SettingsView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: (accentColor ?? Colors.white)
-                  .withValues(alpha: accentColor != null ? 0.12 : 0.05),
+              color: (accentColor ?? Colors.white).withValues(
+                alpha: accentColor != null ? 0.12 : 0.05,
+              ),
               borderRadius: BorderRadius.circular(10),
               border: accentColor != null
                   ? Border.all(color: accentColor.withValues(alpha: 0.3))

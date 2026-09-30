@@ -25,9 +25,12 @@ import '../../features/wallet/views/coin_history_view.dart';
 import '../../features/cosmetics/controllers/cosmetics_controller.dart';
 import '../../features/shop/views/skin_shop_view.dart';
 import '../../features/daily_mission/views/daily_mission_view.dart';
+import '../../features/splash/bindings/splash_binding.dart';
+import '../../features/splash/views/splash_view.dart';
 
 /// Named routes for the Snake game.
 class AppRoutes {
+  static const String splash = '/splash';
   static const String menu = '/menu';
   static const String game = '/game';
   static const String levelSelect = '/level-select';
@@ -46,6 +49,11 @@ class AppRoutes {
   static const String dailyMission = '/daily-mission';
 
   static List<GetPage> routes = [
+    GetPage(
+      name: splash,
+      page: () => const SplashView(),
+      binding: SplashBinding(),
+    ),
     GetPage(
       name: menu,
       page: () => const MenuView(),

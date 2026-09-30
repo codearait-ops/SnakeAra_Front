@@ -14,9 +14,16 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-1268698898067309~1457464547"/>
+        <!-- Firebase Cloud Messaging Defaults -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="daily_challenges_channel" />
+            android:value="daily_challenge_notifications" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

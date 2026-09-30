@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:snake_game/features/game/components/snake_game.dart';
 import 'package:snake_game/features/game/models/casual_mode_models.dart';
 import '../../../app/core/utils/enums.dart';
+import '../../../services/ad_service.dart';
 import '../../../services/api_service.dart';
 import '../../../services/storage_service.dart';
 import '../../settings/controllers/settings_controller.dart';
@@ -255,6 +256,43 @@ class GameController extends GetxController {
 
   /// Go back to the menu.
   void goToMenu() => snakeGame.goToMenu();
+
+  @override
+  void onReady() {
+    super.onReady();
+    _handleEntryInterstitialAd();
+  }
+
+  /// Triggers an interstitial ad on every 4th entry into the game screen.
+  Future<void> _handleEntryInterstitialAd() async {
+    final adService =
+        Get.isRegistered<AdService>() ? Get.find<AdService>() : null;
+    if (adService == null) return;
+
+    final shouldShow =
+        await adService.incrementAndCheckInterstitialEligibility();
+    if (!shouldShow) return;
+
+    debugPrint(
+      '[GameController] 🎯 4th game entry reached! Presenting Interstitial Ad...',
+    );
+
+    // Pause game engine during ad playback so snake doesn't move or die
+    final wasEnginePaused = snakeGame.isIntroWaiting || isIntroShowing.value;
+    if (!wasEnginePaused) {
+      snakeGame.pauseEngine();
+    }
+
+    final context = Get.context;
+    if (context != null && context.mounted) {
+      await adService.showInterstitialAd(context: context);
+    }
+
+    // Resume engine if not waiting on intro dialog
+    if (!wasEnginePaused && !isIntroShowing.value && !snakeGame.isIntroWaiting) {
+      snakeGame.resumeEngine();
+    }
+  }
 
   @override
   void onClose() {

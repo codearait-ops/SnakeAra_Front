@@ -32,6 +32,10 @@ import 'entities/parasite_worm.dart';
 import '../rendering/board_background_renderer.dart';
 import '../rendering/snake_canvas_renderer.dart';
 import '../services/game_session_coordinator.dart';
+import '../modes/base_game_mode_handler.dart';
+import '../modes/level_mode_handler.dart';
+import '../modes/classic_mode_handler.dart';
+import '../modes/casual_mode_handler.dart';
 
 /// The core Flame game engine for Snake.
 ///
@@ -54,9 +58,6 @@ class SnakeGame extends FlameGame {
   final RxDouble casualPowerUpTimeRemaining = 0.0.obs;
   final RxInt casualLives = 3.obs;
   static const int maxCasualLives = 3;
-  int _iceSlideRemaining = 0;
-  int _casualStreak = 0;
-  Direction? _queuedIceDirection;
 
   // --- Daily Mission & Challenge & League ---
   bool isDailyMission = false;
@@ -82,6 +83,89 @@ class SnakeGame extends FlameGame {
   GameMechanicsRng get mechanicsRng {
     _mechanicsRng ??= GameMechanicsRng(seed: isDailyMission ? gameSeed : null);
     return _mechanicsRng!;
+  }
+
+  // --- Strategy Pattern Mode Handler ---
+  BaseGameModeHandler? _modeHandler;
+
+  int get appleTarget => _appleTarget;
+  void triggerLevelComplete() => _levelComplete();
+  void triggerGameOver(GameOverReason reason) => _gameOver(reason);
+  void triggerSnakeSliced(List<GridPos> cutSegments) => _onSnakeSliced(cutSegments);
+
+  int get speed => _speed;
+  set speed(int value) => _speed = value;
+
+  void triggerEatEffect() => _playEatEffect();
+  void triggerShake() => _triggerShake();
+  void triggerConsumeFood() => _consumeFood();
+  void spawnSliceParticles(List<GridPos> cutSegments) => _spawnSliceParticles(cutSegments);
+
+  void logPearEaten(int bonusScore) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('pear_eaten', {
+        'bonus_awarded': bonusScore,
+        'current_score': score.value,
+        'speed_ms': _speed,
+        'snake_length': snake.segments.length,
+      });
+    }
+  }
+
+  void logLifeLost(int remainingLives) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('life_lost', {
+        'remaining_lives': remainingLives,
+      });
+    }
+  }
+
+  void logSnakeCut(int cutSegmentsCount, int remainingLength) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('snake_cut', {
+        'cut_segments_count': cutSegmentsCount,
+        'remaining_length': remainingLength,
+      });
+    }
+  }
+
+  void logPowerUpCollected(String name, double duration) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('power_up_collected', {
+        'type': name,
+        'duration': duration,
+      });
+    }
+  }
+
+  void logRainAppleEaten(int pts) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      final streak = (_modeHandler is CasualModeHandler)
+          ? (_modeHandler as CasualModeHandler).casualStreak
+          : 0;
+      Get.find<GameEventLogger>().logEvent('food_eaten', {
+        'score_awarded': pts,
+        'current_score': score.value,
+        'is_rain_apple': true,
+        'speed_ms': (casualPowerUp.isTurboActive
+            ? (_speed / CasualModeConfig.turboSpeedMultiplier).round()
+            : _speed),
+        'snake_length': snake.segments.length,
+        'streak': streak,
+        'active_powerup': 'appleRain',
+      });
+    }
+  }
+
+  void logCasualMissionCompleted(CasualMission mission) {
+    if (Get.isRegistered<GameEventLogger>()) {
+      Get.find<GameEventLogger>().logEvent('casual_mission_completed', {
+        'mission_id': mission.id,
+        'mission_type': mission.type.name,
+        'target': mission.target,
+        'reward_coins': mission.rewardCoins,
+      });
+    }
   }
 
   // --- Dynamic Grid Dimensions (Square 20x20) ---
@@ -206,13 +290,11 @@ class SnakeGame extends FlameGame {
 
   /// Effective movement interval in seconds, taking active speed modifiers into account.
   double get _effectiveMoveInterval {
-    double speed = _speed.toDouble();
-    if (gameMode.value == GameMode.casual) {
-      if (casualPowerUp.isTurboActive) {
-        speed = _speed / CasualModeConfig.turboSpeedMultiplier;
-      }
+    double spd = _speed.toDouble();
+    if (_modeHandler != null) {
+      spd = _modeHandler!.modifySpeed(spd);
     }
-    return speed / 1000.0;
+    return spd / 1000.0;
   }
 
   // --- Infection Mode state ---
@@ -244,13 +326,9 @@ class SnakeGame extends FlameGame {
   final RxInt activeLaserCol = (-1).obs;
   double _laserTimer = 0.0;
 
-  double _architectTimer = 0.0;
-
   final RxDouble shockwaveRadius = (-1.0).obs;
-  double _shockwaveTimer = 0.0;
 
   final List<BossBullet> bullets = [];
-  double _bulletTimer = 0.0;
 
   // --- Meltdown Mode ---
   double _meltdownAppleTimer = 5.0;
@@ -600,6 +678,9 @@ class SnakeGame extends FlameGame {
     _cancelAllTimers();
     _resetAccumulatorTimers();
     gameMode.value = GameMode.classic;
+    final classicHandler = ClassicModeHandler();
+    _modeHandler = classicHandler;
+    classicHandler.onInit(this);
     refreshSkin();
     applesEaten = 0;
     applesCount.value = 0;
@@ -639,6 +720,9 @@ class SnakeGame extends FlameGame {
     _cancelAllTimers();
     _resetAccumulatorTimers();
     gameMode.value = GameMode.casual;
+    final casualHandler = CasualModeHandler();
+    _modeHandler = casualHandler;
+    casualHandler.onInit(this);
     refreshSkin();
     applesEaten = 0;
     applesCount.value = 0;
@@ -655,44 +739,9 @@ class SnakeGame extends FlameGame {
     pear.despawn();
     pearsCount.value = 0;
     pearScore.value = 0;
-    _iceSlideRemaining = 0;
-    _casualStreak = 0;
-    _queuedIceDirection = null;
-    casualLives.value = maxCasualLives;
 
     snake.init(_gridCols, _gridRows);
     snake.resetInfection();
-
-    optimisticCasualCoins.value = 0;
-    casualPowerUp.init();
-    casualMissionManager.init(
-      onRewardCoins: (coins) {
-        // Optimistic UI preview (Do NOT modify WalletController.balance directly!)
-        optimisticCasualCoins.value += coins;
-        floatingTexts.add(
-          FloatingTextParticle(
-            text: 'coins_reward_floating'.trParams({'coins': '$coins'}),
-            x: snake.head.x.toDouble() + 0.5,
-            y: snake.head.y.toDouble() + 0.5,
-            color: const Color(0xFFFFD700),
-            vy: -2.0,
-          ),
-        );
-      },
-      onMissionCompleted: () {
-        sound.playLevelComplete();
-      },
-      onLogMissionCompleted: (mission) {
-        if (Get.isRegistered<GameEventLogger>()) {
-          Get.find<GameEventLogger>().logEvent('casual_mission_completed', {
-            'mission_id': mission.id,
-            'mission_type': mission.type.name,
-            'target': mission.target,
-            'reward_coins': mission.rewardCoins,
-          });
-        }
-      },
-    );
 
     food.spawn(
       _gridCols,
@@ -974,8 +1023,6 @@ class SnakeGame extends FlameGame {
   }
 
   void _cancelShockwaveTimer() {
-    _shockwavePeriodicTimer?.cancel();
-    _shockwavePeriodicTimer = null;
     shockwaveRadius.value = -1.0;
   }
 
@@ -987,6 +1034,8 @@ class SnakeGame extends FlameGame {
   }
 
   void _resetAccumulatorTimers() {
+    _modeHandler?.onDestroy();
+    _modeHandler = null;
     _gameTime = 0.0;
     _canvasRenderer.resetCache();
     _infectionTimer = 0.0;
@@ -995,13 +1044,8 @@ class SnakeGame extends FlameGame {
     _flashTimer = 0.0;
     _thunderPreTimer = 0.0;
     _laserTimer = 0.0;
-    _architectTimer = 0.0;
-    _shockwaveTimer = 0.0;
-    _bulletTimer = 0.0;
     _meltdownAppleTimer = _meltdownMaxTimer;
     _crabChaseTimer = 0.0;
-    _iceSlideRemaining = 0;
-    _queuedIceDirection = null;
     _firstTickLogged = false;
   }
 
@@ -1011,6 +1055,9 @@ class SnakeGame extends FlameGame {
     _cancelLaserTimers();
     _cancelShockwaveTimer();
     _cancelShakeTimer();
+    if (_modeHandler is LevelModeHandler) {
+      (_modeHandler as LevelModeHandler).cancelTransientTimers();
+    }
   }
 
   /// Initialize Level Mode for the given level.
@@ -1018,6 +1065,9 @@ class SnakeGame extends FlameGame {
     _cancelAllTimers();
     _resetAccumulatorTimers();
     gameMode.value = GameMode.level;
+    final levelHandler = LevelModeHandler();
+    _modeHandler = levelHandler;
+    levelHandler.onInit(this);
     refreshSkin();
     currentLevel = level;
     currentLevelRx.value = level;
@@ -1101,6 +1151,9 @@ class SnakeGame extends FlameGame {
       }
     }
 
+    // --- Mode Handler Update (e.g. LevelModeHandler) ---
+    _modeHandler?.update(safeDt);
+
     // --- Crab Chase Mode Update ---
     if (gameMode.value == GameMode.crabChase) {
       _crabChaseTimer += safeDt;
@@ -1146,9 +1199,8 @@ class SnakeGame extends FlameGame {
       }
     }
 
-    // --- Laser Mode & Boss 2 Laser Core Mechanics Update ---
-    if (gameMode.value == GameMode.laser ||
-        (gameMode.value == GameMode.level && currentLevel == 20)) {
+    // --- Laser Mode Mechanics Update ---
+    if (gameMode.value == GameMode.laser) {
       // Continuous Laser Collision & Slicing Detection (every frame)
       if (activeLaserRow.value >= 0) {
         final targetY = activeLaserRow.value;
@@ -1287,132 +1339,7 @@ class SnakeGame extends FlameGame {
       }
     }
 
-    // --- Level Mode Boss Mechanics Update ---
-    if (gameMode.value == GameMode.level) {
-      // Boss 3 (The Architect - Level 30)
-      if (currentLevel == 30) {
-        _architectTimer += safeDt;
-        if (_architectTimer >= 7.5) {
-          _architectTimer = 0.0;
-          final rand = mechanicsRng.boss ?? Random();
-          for (int attempt = 0; attempt < 30; attempt++) {
-            final rx = rand.nextInt(18) + 1;
-            final ry = rand.nextInt(18) + 1;
-            final pos = GridPos(rx, ry);
-            if (!snake.segments.contains(pos) &&
-                food.position != pos &&
-                !obstacles.occupiesPosition(pos)) {
-              obstacles.addObstacle(pos);
-              sound.playEatApple();
-              break;
-            }
-          }
-        }
-      }
-
-      // Boss 4 (Void Sentinel - Level 40)
-      if (currentLevel == 40) {
-        _shockwaveTimer += safeDt;
-        if (_shockwaveTimer >= 8.0) {
-          _shockwaveTimer = 0.0;
-          sound.playFlamethrower();
-          double r = 0.0;
-          _shockwavePeriodicTimer?.cancel();
-          _shockwavePeriodicTimer = Timer.periodic(
-            const Duration(milliseconds: 35),
-            (timer) {
-              if (gameStatus.value != GameStatus.playing) {
-                timer.cancel();
-                _shockwavePeriodicTimer = null;
-                shockwaveRadius.value = -1.0;
-                return;
-              }
-              r += 0.2; // Slower speed for the wave
-              shockwaveRadius.value = r;
-
-              final isHit = snake.segments.any((s) {
-                final dist = s.y.toDouble();
-                return (dist - r).abs() < 0.65;
-              });
-
-              if (isHit) {
-                timer.cancel();
-                _shockwavePeriodicTimer = null;
-                shockwaveRadius.value = -1.0;
-                _gameOver(GameOverReason.obstacleCollision);
-              }
-
-              if (r >= _gridRows.toDouble()) {
-                timer.cancel();
-                _shockwavePeriodicTimer = null;
-                shockwaveRadius.value = -1.0;
-              }
-            },
-          );
-        }
-      }
-
-      // Boss 5 (The Overlord - Level 50)
-      if (currentLevel == 50) {
-        _bulletTimer += safeDt;
-        if (_bulletTimer >= 3.2) {
-          _bulletTimer = 0.0;
-          final rand = Random();
-          final isHorizontal = rand.nextBool();
-          if (isHorizontal) {
-            final y = (rand.nextInt(18) + 1).toDouble();
-            final fromLeft = rand.nextBool();
-            bullets.add(
-              BossBullet(
-                x: fromLeft ? 0.0 : 19.0,
-                y: y,
-                vx: fromLeft ? 8.5 : -8.5,
-                vy: 0.0,
-              ),
-            );
-          } else {
-            final x = (rand.nextInt(18) + 1).toDouble();
-            final fromTop = rand.nextBool();
-            bullets.add(
-              BossBullet(
-                x: x,
-                y: fromTop ? 0.0 : 19.0,
-                vx: 0.0,
-                vy: fromTop ? 8.5 : -8.5,
-              ),
-            );
-          }
-          sound.playCameraFlash();
-        }
-
-        for (int i = bullets.length - 1; i >= 0; i--) {
-          final b = bullets[i];
-          b.x += b.vx * safeDt;
-          b.y += b.vy * safeDt;
-
-          const double hitRadiusSq = 0.85 * 0.85;
-          final isHit = snake.segments.any((s) {
-            final dx = s.x - b.x;
-            final dy = s.y - b.y;
-            return (dx * dx + dy * dy) < hitRadiusSq;
-          });
-
-          if (isHit) {
-            bullets.clear();
-            _gameOver(GameOverReason.bulletCollision);
-            return;
-          }
-
-          if (b.x < -1 || b.x > 21 || b.y < -1 || b.y > 21) {
-            bullets.removeAt(i);
-          }
-        }
-      }
-    }
-
-    if (gameMode.value == GameMode.classic) {
-      pear.update(safeDt);
-    } else if (gameMode.value == GameMode.infection) {
+    if (gameMode.value == GameMode.infection) {
       if (!_parasiteAttached) {
         _parasiteIntroTimer += safeDt;
         if (_parasiteIntroTimer >= 5.0 && _parasite == null) {
@@ -1520,37 +1447,6 @@ class SnakeGame extends FlameGame {
       }
     }
 
-    // --- Casual Mode Update ---
-    if (gameMode.value == GameMode.casual) {
-      final consumedByMagnet = casualPowerUp.update(
-        dt: safeDt,
-        gridWidth: _gridCols,
-        gridHeight: _gridRows,
-        snakeSegments: snake.segments,
-        obstacles: obstacles.obstacles,
-        food: food,
-      );
-      if (consumedByMagnet && gameStatus.value == GameStatus.playing) {
-        _consumeFood();
-      }
-      casualMissionManager.update(safeDt);
-      if (casualActivePowerUp.value != casualPowerUp.activePowerUp) {
-        casualActivePowerUp.value = casualPowerUp.activePowerUp;
-      }
-      final remainingDuration = casualPowerUp.activeDurationRemaining;
-      if (remainingDuration <= 0) {
-        if (casualPowerUpTimeRemaining.value != 0.0) {
-          casualPowerUpTimeRemaining.value = 0.0;
-        }
-      } else {
-        // Round to 1 decimal place to prevent 60-120fps UI rebuild thrashing
-        final rounded = (remainingDuration * 10).round() / 10.0;
-        if ((casualPowerUpTimeRemaining.value - rounded).abs() >= 0.05) {
-          casualPowerUpTimeRemaining.value = rounded;
-        }
-      }
-    }
-
     final moveInterval = _effectiveMoveInterval;
     _moveAccumulator += safeDt;
 
@@ -1574,30 +1470,12 @@ class SnakeGame extends FlameGame {
         '[SnakeGame] 🐍 First _gameTick executed! Head: ${snake.head}, direction: ${snake.currentDirection}, status: ${gameStatus.value}',
       );
     }
-    if (_inputQueue.isNotEmpty) {
-      final nextDir = _inputQueue.removeAt(0);
-      if (gameMode.value == GameMode.casual &&
-          casualPowerUp.activePowerUp == PowerUpType.ice) {
-        if (nextDir != snake.currentDirection &&
-            !nextDir.isOpposite(snake.currentDirection)) {
-          if (_iceSlideRemaining == 0) {
-            _iceSlideRemaining = 1;
-            _queuedIceDirection = nextDir;
-          } else {
-            snake.changeDirection(nextDir);
-            _iceSlideRemaining = 0;
-            _queuedIceDirection = null;
-          }
-        } else {
-          snake.changeDirection(nextDir);
-        }
-      } else {
-        snake.changeDirection(nextDir);
+    final Direction? queuedDir =
+        _inputQueue.isNotEmpty ? _inputQueue.removeAt(0) : null;
+    if (_modeHandler?.handleDirectionChange(queuedDir) != true) {
+      if (queuedDir != null) {
+        snake.changeDirection(queuedDir);
       }
-    } else if (_iceSlideRemaining > 0 && _queuedIceDirection != null) {
-      _iceSlideRemaining--;
-      snake.changeDirection(_queuedIceDirection!);
-      _queuedIceDirection = null;
     }
 
     snake.move(_gridCols, _gridRows);
@@ -1609,144 +1487,16 @@ class SnakeGame extends FlameGame {
       return;
     }
 
-    // Self collision
-    if (gameMode.value == GameMode.casual) {
-      // In Casual Mode: Ghost allows passing through self safely. Otherwise deduct life and cut snake at collision point.
-      if (!casualPowerUp.isGhostActive) {
-        final h = snake.head;
-        for (int i = 1; i < snake.segments.length; i++) {
-          if (snake.segments[i] == h) {
-            casualLives.value--;
-            _casualStreak = 0; // Cut consequence: streak reset
-
-            Get.find<GameEventLogger>().logEvent('life_lost', {
-              'remaining_lives': casualLives.value,
-            });
-
-            if (casualLives.value <= 0) {
-              _triggerShake();
-              sound.playGameOver();
-              _gameOver(GameOverReason.selfCollision);
-              return;
-            }
-
-            final cutIndex = max(CasualModeConfig.minSnakeLength, i);
-            if (cutIndex < snake.segments.length) {
-              final cutSegments = snake.sliceAt(cutIndex);
-              if (cutSegments.isNotEmpty) {
-                _spawnSliceParticles(cutSegments);
-                Get.find<GameEventLogger>().logEvent('snake_cut', {
-                  'cut_segments_count': cutSegments.length,
-                  'remaining_length': snake.segments.length,
-                });
-              }
-            }
-
-            _triggerShake();
-            sound.playLaserWarning();
-            floatingTexts.add(
-              FloatingTextParticle(
-                text: '💔 -1',
-                x: h.x.toDouble() + 0.5,
-                y: h.y.toDouble() + 0.5,
-                color: const Color(0xFFFF1744),
-                vy: -2.2,
-              ),
-            );
-            break;
-          }
-        }
-      }
-    } else {
+    // Self collision (delegated to mode handler if custom)
+    if (_modeHandler?.checkCustomCollision(head) != true) {
       if (snake.checkSelfCollision()) {
         _gameOver(GameOverReason.selfCollision);
         return;
       }
     }
 
-    // Casual Mode Power-Up Collection
-    if (gameMode.value == GameMode.casual) {
-      final collected = casualPowerUp.checkCollection(head);
-      if (collected != null) {
-        floatingTexts.add(
-          FloatingTextParticle(
-            text: '${collected.emoji} ${collected.displayNameTr}!',
-            x: head.x.toDouble() + 0.5,
-            y: head.y.toDouble() + 0.5,
-            color: collected.color,
-            vy: -2.0,
-          ),
-        );
-        sound.playHeal();
-        Get.find<GameEventLogger>().logEvent('power_up_collected', {
-          'type': collected.name,
-          'duration': CasualModeConfig.powerUpDuration,
-        });
-      }
-
-      // Casual Mode Rain Apple Collection (Apple Rain power-up)
-      if (casualPowerUp.isAppleRainActive &&
-          casualPowerUp.checkRainAppleCollection(head)) {
-        snake.grow();
-        applesEaten++;
-        applesCount.value = applesEaten;
-        _casualStreak++;
-        final streakBonus = min(10, _casualStreak);
-        final pts = 10 + streakBonus;
-        score.value += pts;
-        floatingTexts.add(
-          FloatingTextParticle(
-            text: '+$pts',
-            x: head.x.toDouble() + 0.5,
-            y: head.y.toDouble() + 0.5,
-            color: const Color(0xFFFF5722),
-          ),
-        );
-        sound.playEatApple();
-        casualMissionManager.onAppleEaten(casualPowerUp.activePowerUp);
-        Get.find<GameEventLogger>().logEvent('food_eaten', {
-          'score_awarded': pts,
-          'current_score': score.value,
-          'is_rain_apple': true,
-          'speed_ms': (casualPowerUp.isTurboActive
-              ? (_speed / CasualModeConfig.turboSpeedMultiplier).round()
-              : _speed),
-          'snake_length': snake.segments.length,
-          'streak': _casualStreak,
-          'active_powerup': 'appleRain',
-        });
-      }
-    }
-
-    // Pear collision (Classic Mode)
-    if (gameMode.value == GameMode.classic &&
-        pear.isActive &&
-        head == pear.position) {
-      snake.grow();
-      final bonusScore = (50 + pear.timeProgress * 50).round();
-      score.value += bonusScore;
-      pearsCount.value++;
-      pearScore.value += bonusScore;
-      floatingTexts.add(
-        FloatingTextParticle(
-          text: '+$bonusScore',
-          x: pear.position!.x.toDouble() + 0.5,
-          y: pear.position!.y.toDouble() + 0.5,
-          color: const Color(0xFFFFD700),
-        ),
-      );
-
-      Get.find<GameEventLogger>().logEvent('pear_eaten', {
-        'bonus_awarded': bonusScore,
-        'current_score': score.value,
-        'speed_ms': _speed,
-        'snake_length': snake.segments.length,
-      });
-
-      _playEatEffect();
-      sound.playEatApple();
-      pear.despawn();
-    }
+    // Mode-specific step processing (power-ups, rain apples, pears, etc.)
+    _modeHandler?.onStep(head);
 
     // Food collision
     if (head == food.position) {
@@ -1796,6 +1546,9 @@ class SnakeGame extends FlameGame {
         'snake_length': snake.segments.length,
       });
     } else if (gameMode.value == GameMode.casual) {
+      final streak = (_modeHandler is CasualModeHandler)
+          ? (_modeHandler as CasualModeHandler).casualStreak
+          : 0;
       Get.find<GameEventLogger>().logEvent('food_eaten', {
         'score_awarded': scoreAwarded,
         'current_score': score.value,
@@ -1803,7 +1556,7 @@ class SnakeGame extends FlameGame {
             ? (_speed / CasualModeConfig.turboSpeedMultiplier).round()
             : _speed),
         'snake_length': snake.segments.length,
-        'streak': _casualStreak,
+        'streak': streak,
         'active_powerup': casualPowerUp.activePowerUp?.name,
       });
     }
@@ -1826,11 +1579,6 @@ class SnakeGame extends FlameGame {
       sound.playHeal();
     } else {
       sound.playEatApple();
-    }
-
-    if (gameMode.value == GameMode.casual) {
-      _casualStreak++;
-      casualMissionManager.onAppleEaten(casualPowerUp.activePowerUp);
     }
 
     if (gameMode.value == GameMode.meltdown) {
@@ -1861,28 +1609,9 @@ class SnakeGame extends FlameGame {
       }
     }
 
-    if (gameMode.value == GameMode.classic) {
-      // Accelerate speed dynamically in Classic Mode (down to min limit 70ms)
-      if (applesEaten % 5 == 0 && _speed > 70) {
-        _speed = max(70, _speed - 10);
-      }
-      // Every 5 apples eaten, spawn a Pear alongside the 6th apple!
-      if (applesEaten % 5 == 0) {
-        pear.spawn(
-          _gridCols,
-          _gridRows,
-          snake.segments,
-          obstacles.obstacles,
-          food.position,
-          mechanicsRng.bonus ?? Random(),
-        );
-      }
-    } else if (gameMode.value == GameMode.level) {
-      // Check level completion in Level Mode (if appleTarget > 0)
-      if (_appleTarget > 0 && applesEaten >= _appleTarget) {
-        _levelComplete();
-        return;
-      }
+    _modeHandler?.onFoodEaten(food.position);
+    if (gameStatus.value == GameStatus.levelComplete) {
+      return;
     }
 
     food.spawn(
@@ -1904,7 +1633,11 @@ class SnakeGame extends FlameGame {
     final int addedPoints;
     final Color popupColor;
 
-    if (gameMode.value == GameMode.meltdown) {
+    final customScore = _modeHandler?.getScoreForFood();
+    if (customScore != null) {
+      addedPoints = customScore.points;
+      popupColor = customScore.color;
+    } else if (gameMode.value == GameMode.meltdown) {
       // Meltdown Mode: Progressive score
       addedPoints = 10 + (applesEaten - 1) * 5;
       popupColor = const Color(0xFFC6FF00); // Neon Yellow-Green
@@ -1933,10 +1666,6 @@ class SnakeGame extends FlameGame {
       // Crab Chase Mode: Escalating progressive score per apple (same as Laser Mode: 10, 15, 20, 25...)
       addedPoints = 10 + (applesEaten - 1) * 5;
       popupColor = const Color(0xFFFF5722); // Crab Chase Deep Orange
-    } else if (gameMode.value == GameMode.classic) {
-      // Classic Mode: Exactly 10 points per apple forever
-      addedPoints = 10;
-      popupColor = kPrimaryColor; // Classic Theme Green (0xFF00E676)
     } else if (gameMode.value == GameMode.blindMemory) {
       // Blind Memory Mode: 50 points per apple
       addedPoints = 50;
@@ -1945,13 +1674,6 @@ class SnakeGame extends FlameGame {
       // Infection Mode: 10 points per apple
       addedPoints = 10;
       popupColor = const Color(0xFFFF1744); // Infection Theme Red
-    } else if (gameMode.value == GameMode.casual) {
-      // Casual Mode: 10 base points + streak bonus (up to +10)
-      final streakBonus = min(10, _casualStreak);
-      addedPoints = 10 + streakBonus;
-      popupColor = const Color(
-        0xFFA855F7,
-      ); // Casual Theme Vibrant Fantasy Purple
     } else {
       // Custom Mode
       addedPoints = 10;
@@ -2007,9 +1729,8 @@ class SnakeGame extends FlameGame {
         _timeRemaining--;
         timeRemaining.value = _timeRemaining;
         if (_timeRemaining <= 0) {
-          if (gameMode.value == GameMode.level && _appleTarget == 0) {
-            // Survival boss survived the time limit!
-            _levelComplete();
+          if (_modeHandler?.onTimeExpired() == true) {
+            // Handled by active mode handler (e.g. survival boss complete)
           } else {
             _gameOver(GameOverReason.timerExpired);
           }
@@ -2092,6 +1813,7 @@ class SnakeGame extends FlameGame {
       return;
     }
     _cancelAllTimers();
+    _modeHandler?.onGameOver();
     gameStatus.value = GameStatus.gameOver;
     gameOverReason.value = reason;
 
@@ -2354,6 +2076,8 @@ class SnakeGame extends FlameGame {
 
   @override
   void onRemove() {
+    _modeHandler?.onDestroy();
+    _modeHandler = null;
     _cancelAllTimers();
     _backgroundRenderer.dispose();
     super.onRemove();

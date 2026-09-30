@@ -8,6 +8,8 @@ abstract class AdConfig {
   static const String adMobRewardedId = 'ca-app-pub-1268698898067309/7809838642';
   static const String adMobRewardedInterstitialId =
       'ca-app-pub-1268698898067309/5922041902';
+  static const String adMobInterstitialId =
+      'ca-app-pub-1268698898067309/1910854133';
 
   // ---------------------------------------------------------------------------
   // Tapsell Configuration
@@ -16,14 +18,21 @@ abstract class AdConfig {
       'cpgaaafsliptqsefjtptdhqogqhdqjhrntpbrfisptqifltdddjqadqlaitbthqgdatepd';
   static const String tapsellRewardedZoneId = '6ab5a71eda860d2c9f00d0b1';
   static const String tapsellBannerZoneId = '6ab5a7bd8670d80bfc879875';
+  static const String tapsellInterstitialZoneId = '6ab9450e4857ba5d4020edae';
+
+  // ---------------------------------------------------------------------------
+  // Gameplay Interstitial Configuration
+  // ---------------------------------------------------------------------------
+  /// Show an interstitial ad every 4 times the user enters the game view.
+  static const int interstitialPlayFrequency = 4;
 
   // ---------------------------------------------------------------------------
   // Waterfall Timing Configurations
   // ---------------------------------------------------------------------------
   /// Maximum duration to wait for AdMob to load an ad before falling back to Tapsell.
   /// Prevents indefinite stalls in restricted network environments.
-  static const Duration adMobLoadTimeout = Duration(seconds: 8);
+  static const Duration adMobLoadTimeout = Duration(seconds: 4);
 
   /// Maximum duration to wait for Tapsell to request an ad.
-  static const Duration tapsellRequestTimeout = Duration(seconds: 10);
+  static const Duration tapsellRequestTimeout = Duration(seconds: 5);
 }

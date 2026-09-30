@@ -11,8 +11,10 @@ import '../../../services/ad_service.dart';
 import '../../../services/api_service.dart';
 import '../../../services/game_event_logger.dart';
 import '../../../services/league_api_service.dart';
+import '../../../services/app_update_service.dart';
 
 import '../../../features/cosmetics/services/theme_cache_service.dart';
+import '../../../features/menu/controllers/menu_controller.dart';
 
 /// Global initial bindings for GetX dependency injection.
 class InitialBinding extends Bindings {
@@ -24,6 +26,7 @@ class InitialBinding extends Bindings {
     Get.put<LeagueApiService>(LeagueApiService(), permanent: true);
     Get.put<ThemeCacheService>(ThemeCacheService(), permanent: true);
     Get.put<CosmeticsRepository>(CosmeticsRepository(), permanent: true);
+    Get.put<AppUpdateService>(AppUpdateService(), permanent: true);
 
     // 2. State Controllers
     Get.put<AuthController>(AuthController(), permanent: true);
@@ -33,6 +36,7 @@ class InitialBinding extends Bindings {
     Get.put<SettingsController>(SettingsController(), permanent: true);
     Get.put<LevelController>(LevelController(), permanent: true);
     Get.put<CosmeticsController>(CosmeticsController(), permanent: true);
+    Get.put<MenuController>(MenuController(), permanent: true);
 
     // 3. Dependent Services & Trackers
     Get.put<GameEventLogger>(GameEventLogger(), permanent: true);

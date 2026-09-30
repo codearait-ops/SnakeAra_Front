@@ -6,7 +6,8 @@ class AppTranslations extends Translations {
   Map<String, Map<String, String>> get keys => {
     'en_US': {
       // General & App
-      'app_title': 'SNAKE',
+      'app_title': 'SnakeAra',
+      'app_version_info': 'Version @version • Build @build',
       'subtitle': 'Every Mode Changes the Rules',
       'competition_section_title': 'Champions Arena',
       'competition_section_tagline': 'Break unreachable records and claim the top!',
@@ -36,6 +37,17 @@ class AppTranslations extends Translations {
       'no_champions_yet': 'No champions recorded for this week yet.',
       'my_league_medals': 'My League Medals',
       'settings': 'SETTINGS',
+
+      // Splash Screen
+      'splash_loading_init': 'Initializing SnakeAra...',
+      'splash_checking_auth': 'Checking user account...',
+      'splash_loading_data': 'Syncing game data...',
+      'splash_ready': 'Ready to Play!',
+      'splash_error_timeout': 'Connection timed out. Please check your network.',
+      'splash_error_general': 'Failed to load game data. Please try again.',
+      'splash_retry_btn': 'Retry Connection',
+      'splash_offline_btn': 'Continue as Guest / Offline',
+      'splash_tagline': 'Every Mode Changes the Rules',
 
       // Game Modes
       'classic_mode': 'CLASSIC MODE',
@@ -810,10 +822,35 @@ A little snake has entered the magical garden! The garden is filled with delicio
       'player_profile': 'Player Profile',
       'rank_col': 'Rank',
       'pts_unit': 'Pts',
+
+      // Feedback & Support
+      'feedback_section_title': 'Feedback & Support',
+      'feedback_title': 'Feedback & Suggestions',
+      'feedback_subtitle': 'Share your ideas, bugs, or feedback with us',
+      'feedback_type_suggestion': 'Suggestion',
+      'feedback_type_bug': 'Bug Report',
+      'feedback_type_criticism': 'Criticism',
+      'feedback_type_other': 'Other',
+      'feedback_message_hint': 'Write your message, idea, or issue here...',
+      'feedback_contact_hint': 'Email or contact ID (optional)',
+      'feedback_send_btn': 'Send Feedback',
+      'feedback_sending': 'Sending...',
+      'feedback_success': 'Thank you! Your feedback has been received.',
+      'err_feedback_failed': 'Failed to send feedback. Please try again.',
+      'err_feedback_empty': 'Please enter your message (at least 5 characters).',
+
+      // App Update Dialog
+      'update_force_title': 'Mandatory Update Required! 🚀',
+      'update_optional_title': 'New Update Available! 🚀',
+      'update_mandatory_badge': 'MANDATORY UPDATE',
+      'update_whats_new': 'What\'s New:',
+      'update_now_btn': 'Update Now',
+      'update_later_btn': 'Maybe Later',
     },
     'fa_IR': {
       // General & App
-      'app_title': 'مار بازی',
+      'app_title': 'SnakeAra',
+      'app_version_info': 'نسخه @version • بیلد @build',
       'subtitle': 'هر حالت قوانین متفاوتی دارد',
       'competition_section_title': 'میدان رقابت و چالش',
       'competition_section_tagline': 'رکوردهای دست‌نیافتنی رو فتح کن و به صدر برس',
@@ -844,6 +881,17 @@ A little snake has entered the magical garden! The garden is filled with delicio
       'no_champions_yet': 'هنوز رکوردی ثبت نشده است',
       'my_league_medals': 'مدال‌های لیگ من',
       'settings': 'تنظیمات',
+
+      // Splash Screen
+      'splash_loading_init': 'در حال راه‌اندازی بازی...',
+      'splash_checking_auth': 'بررسی حساب کاربری...',
+      'splash_loading_data': 'در حال دریافت اطلاعات و همگام‌سازی...',
+      'splash_ready': 'آماده ورود به بازی!',
+      'splash_error_timeout': 'زمان اتصال به پایان رسید. لطفاً اینترنت خود را بررسی کنید.',
+      'splash_error_general': 'خطا در دریافت اطلاعات. لطفاً دوباره تلاش کنید.',
+      'splash_retry_btn': 'تلاش مجدد',
+      'splash_offline_btn': 'ورود در حالت مهمان / آفلاین',
+      'splash_tagline': 'هر حالت قوانین متفاوتی دارد',
 
       // Game Modes
       'classic_mode': 'حالت کلاسیک',
@@ -1619,6 +1667,30 @@ A little snake has entered the magical garden! The garden is filled with delicio
       'player_profile': 'پروفایل بازیکن',
       'rank_col': 'رتبه',
       'pts_unit': 'امتیاز',
+
+      // Feedback & Support
+      'feedback_section_title': 'ارتباط و پشتیبانی',
+      'feedback_title': 'ارسال نظرات و پیشنهادات',
+      'feedback_subtitle': 'نظرات، ایده‌ها و مشکلات خود را با ما در میان بگذارید',
+      'feedback_type_suggestion': 'پیشنهاد و ایده',
+      'feedback_type_bug': 'گزارش باگ و مشکل',
+      'feedback_type_criticism': 'انتقاد و بازخورد',
+      'feedback_type_other': 'سایر موارد',
+      'feedback_message_hint': 'پیام، ایده یا مشکل خود را با ما در میان بگذارید...',
+      'feedback_contact_hint': 'ایمیل یا شناسه جهت ارتباط (اختیاری)',
+      'feedback_send_btn': 'ارسال نظر',
+      'feedback_sending': 'در حال ارسال...',
+      'feedback_success': 'با تشکر! نظر شما با موفقیت ثبت شد.',
+      'err_feedback_failed': 'خطا در ارسال نظر. لطفاً دوباره تلاش کنید.',
+      'err_feedback_empty': 'لطفاً متن پیام خود را بنویسید (حداقل ۵ کاراکتر).',
+
+      // App Update Dialog
+      'update_force_title': 'به‌روزرسانی اجباری بازی! 🚀',
+      'update_optional_title': 'نسخه جدید اسنیک‌آرا آماده است! 🚀',
+      'update_mandatory_badge': 'به‌روزرسانی اجباری',
+      'update_whats_new': 'تغییرات نسخه جدید:',
+      'update_now_btn': 'به‌روزرسانی بازی',
+      'update_later_btn': 'فعلاً نه / بعداً',
     },
   };
 }

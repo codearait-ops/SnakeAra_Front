@@ -49,7 +49,7 @@ class SnakeApp extends StatelessWidget {
       locale: settings.currentLocale,
       fallbackLocale: const Locale('en', 'US'),
       initialBinding: InitialBinding(),
-      initialRoute: AppRoutes.menu,
+      initialRoute: AppRoutes.splash,
       getPages: AppRoutes.routes,
       defaultTransition: Transition.fadeIn,
       routingCallback: (routing) {

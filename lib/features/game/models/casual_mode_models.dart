@@ -37,8 +37,8 @@ class CasualModeConfig {
   /// Maximum simultaneous rain apples placed during Apple Rain.
   static const int appleRainMaxApples = 5;
 
-  /// Candidate target values for generated missions based on difficulty.
-  static const List<int> appleTargetPool = [5, 7, 8, 10];
+  /// Candidate target values for generated missions based on difficulty (max 5 apples).
+  static const List<int> appleTargetPool = [2, 3, 4, 5];
 }
 
 /// The 5 distinct power-up types in Casual Mode.

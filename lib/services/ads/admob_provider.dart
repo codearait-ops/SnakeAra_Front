@@ -4,7 +4,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'ad_config.dart';
 import 'ad_provider.dart';
 
-/// Provider for Google Mobile Ads (AdMob) Rewarded Ads.
+/// Provider for Google Mobile Ads (AdMob) Rewarded and Interstitial Ads.
 class AdMobProvider implements AdNetworkProvider {
   @override
   String get providerName => 'Google AdMob';
@@ -45,13 +45,12 @@ class AdMobProvider implements AdNetworkProvider {
             if (!loadCompleter.isCompleted) {
               loadCompleter.complete(ad);
             } else {
-              // Timed out previously, dispose of the late ad
               ad.dispose();
             }
           },
           onAdFailedToLoad: (LoadAdError error) {
             debugPrint(
-              '[AdMobProvider] AdMob load failed: code=${error.code}, domain=${error.domain}, message=${error.message}',
+              '[AdMobProvider] AdMob Rewarded load failed: code=${error.code}, domain=${error.domain}, message=${error.message}',
             );
             if (!loadCompleter.isCompleted) {
               loadCompleter.complete(null);
@@ -60,12 +59,11 @@ class AdMobProvider implements AdNetworkProvider {
         ),
       );
 
-      // Wait with timeout to prevent blocking when Google is restricted/unreachable
       final RewardedAd? loadedAd = await loadCompleter.future.timeout(
         AdConfig.adMobLoadTimeout,
         onTimeout: () {
           debugPrint(
-            '[AdMobProvider] AdMob load timed out after ${AdConfig.adMobLoadTimeout.inSeconds}s.',
+            '[AdMobProvider] AdMob Rewarded load timed out after ${AdConfig.adMobLoadTimeout.inSeconds}s.',
           );
           if (!loadCompleter.isCompleted) {
             loadCompleter.complete(null);
@@ -75,7 +73,7 @@ class AdMobProvider implements AdNetworkProvider {
       );
 
       if (loadedAd == null) {
-        debugPrint('[AdMobProvider] No AdMob ad available.');
+        debugPrint('[AdMobProvider] No AdMob rewarded ad available.');
         return false;
       }
 
@@ -84,11 +82,11 @@ class AdMobProvider implements AdNetworkProvider {
 
       loadedAd.fullScreenContentCallback = FullScreenContentCallback(
         onAdShowedFullScreenContent: (ad) {
-          debugPrint('[AdMobProvider] AdMob ad opened in fullscreen.');
+          debugPrint('[AdMobProvider] AdMob rewarded ad opened in fullscreen.');
         },
         onAdDismissedFullScreenContent: (ad) {
           debugPrint(
-            '[AdMobProvider] AdMob ad closed. User earned reward: $earnedReward',
+            '[AdMobProvider] AdMob rewarded ad closed. User earned reward: $earnedReward',
           );
           ad.dispose();
           if (!showCompleter.isCompleted) {
@@ -96,7 +94,9 @@ class AdMobProvider implements AdNetworkProvider {
           }
         },
         onAdFailedToShowFullScreenContent: (ad, AdError error) {
-          debugPrint('[AdMobProvider] AdMob failed to display: ${error.message}');
+          debugPrint(
+            '[AdMobProvider] AdMob rewarded ad failed to display: ${error.message}',
+          );
           ad.dispose();
           if (!showCompleter.isCompleted) {
             showCompleter.complete(false);
@@ -104,7 +104,6 @@ class AdMobProvider implements AdNetworkProvider {
         },
       );
 
-      // Dismiss any loading dialog before presenting the fullscreen ad
       onBeforeShow?.call();
 
       await loadedAd.show(
@@ -119,6 +118,94 @@ class AdMobProvider implements AdNetworkProvider {
       return await showCompleter.future;
     } catch (e) {
       debugPrint('[AdMobProvider] Unexpected exception in showRewardedAd: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> showInterstitialAd({
+    required BuildContext context,
+    VoidCallback? onBeforeShow,
+  }) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    debugPrint('[AdMobProvider] Attempting to load Google AdMob Interstitial Ad...');
+    final Completer<InterstitialAd?> loadCompleter =
+        Completer<InterstitialAd?>();
+
+    try {
+      InterstitialAd.load(
+        adUnitId: AdConfig.adMobInterstitialId,
+        request: const AdRequest(),
+        adLoadCallback: InterstitialAdLoadCallback(
+          onAdLoaded: (InterstitialAd ad) {
+            debugPrint('[AdMobProvider] AdMob Interstitial Ad loaded successfully.');
+            if (!loadCompleter.isCompleted) {
+              loadCompleter.complete(ad);
+            } else {
+              ad.dispose();
+            }
+          },
+          onAdFailedToLoad: (LoadAdError error) {
+            debugPrint(
+              '[AdMobProvider] AdMob Interstitial load failed: code=${error.code}, domain=${error.domain}, message=${error.message}',
+            );
+            if (!loadCompleter.isCompleted) {
+              loadCompleter.complete(null);
+            }
+          },
+        ),
+      );
+
+      final InterstitialAd? loadedAd = await loadCompleter.future.timeout(
+        AdConfig.adMobLoadTimeout,
+        onTimeout: () {
+          debugPrint(
+            '[AdMobProvider] AdMob Interstitial load timed out after ${AdConfig.adMobLoadTimeout.inSeconds}s.',
+          );
+          if (!loadCompleter.isCompleted) {
+            loadCompleter.complete(null);
+          }
+          return null;
+        },
+      );
+
+      if (loadedAd == null) {
+        debugPrint('[AdMobProvider] No AdMob interstitial ad available.');
+        return false;
+      }
+
+      final Completer<bool> showCompleter = Completer<bool>();
+
+      loadedAd.fullScreenContentCallback = FullScreenContentCallback(
+        onAdShowedFullScreenContent: (ad) {
+          debugPrint('[AdMobProvider] AdMob Interstitial opened in fullscreen.');
+        },
+        onAdDismissedFullScreenContent: (ad) {
+          debugPrint('[AdMobProvider] AdMob Interstitial closed normally.');
+          ad.dispose();
+          if (!showCompleter.isCompleted) {
+            showCompleter.complete(true);
+          }
+        },
+        onAdFailedToShowFullScreenContent: (ad, AdError error) {
+          debugPrint(
+            '[AdMobProvider] AdMob Interstitial failed to display: ${error.message}',
+          );
+          ad.dispose();
+          if (!showCompleter.isCompleted) {
+            showCompleter.complete(false);
+          }
+        },
+      );
+
+      onBeforeShow?.call();
+      await loadedAd.show();
+      return await showCompleter.future;
+    } catch (e) {
+      debugPrint('[AdMobProvider] Unexpected exception in showInterstitialAd: $e');
       return false;
     }
   }

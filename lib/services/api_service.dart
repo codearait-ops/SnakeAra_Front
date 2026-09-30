@@ -25,6 +25,7 @@ import 'api/leaderboard_api.dart';
 import 'api/missions_api.dart';
 import 'api/shop_api.dart';
 import 'api/wallet_api.dart';
+import 'api/feedback_api.dart';
 
 export 'models/api_responses.dart';
 
@@ -43,6 +44,7 @@ class ApiService extends GetxService {
   late final LeaderboardApi _leaderboardApi;
   late final MissionsApi _missionsApi;
   late final DashboardApi _dashboardApi;
+  late final FeedbackApi _feedbackApi;
 
   Dio get dio => _dio;
   AuthApi get authApi => _authApi;
@@ -51,6 +53,7 @@ class ApiService extends GetxService {
   LeaderboardApi get leaderboardApi => _leaderboardApi;
   MissionsApi get missionsApi => _missionsApi;
   DashboardApi get dashboardApi => _dashboardApi;
+  FeedbackApi get feedbackApi => _feedbackApi;
 
   /// Safely parses coins which might be num, Map (e.g. {total: 0, breakdown: []}), or String
   static int? parseCoins(dynamic raw) {
@@ -138,6 +141,7 @@ class ApiService extends GetxService {
     _leaderboardApi = LeaderboardApi(_dio);
     _missionsApi = MissionsApi(_dio);
     _dashboardApi = DashboardApi(_dio);
+    _feedbackApi = FeedbackApi(_dio);
   }
 
   // ===========================================================================
@@ -413,8 +417,17 @@ class ApiService extends GetxService {
           'verification_token': verificationToken,
       };
 
-      debugPrint('--- [ApiService] submitScore OUTGOING PAYLOAD ---');
-      debugPrint('📦 Payload: $payload');
+      debugPrint('--- [ApiService] submitScore OUTGOING PAYLOAD (full) ---');
+      debugPrint('session_id: ${payload['session_id']}');
+      debugPrint('value: ${payload['value']}, final_score: ${payload['final_score']}');
+      debugPrint('user_id: ${payload['user_id']}, game_mode: ${payload['game_mode']}');
+      final eventList = payload['events'] as List?;
+      debugPrint('events count: ${eventList?.length ?? 0}');
+      if (eventList != null) {
+        for (int i = 0; i < eventList.length; i++) {
+          debugPrint('event[$i]: ${eventList[i]}');
+        }
+      }
 
       final options = Options(
         headers: {
@@ -502,7 +515,11 @@ class ApiService extends GetxService {
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 422) {
-        debugPrint('🚨 [ApiService] 422 response body: ${e.response?.data}');
+        final body = e.response?.data;
+        debugPrint('🚨 [ApiService] 422 FULL response body: $body');
+        if (body is Map && body['errors'] != null) {
+          debugPrint('🚨 [ApiService] 422 VALIDATION ERRORS: ${body['errors']}');
+        }
       } else {
         debugPrint('[ApiService] submitScore DioException ($status): ${e.message}, data: ${e.response?.data}');
       }
@@ -782,6 +799,27 @@ class ApiService extends GetxService {
     itemId: itemId,
     itemType: itemType,
     token: token,
+  );
+
+  // ===========================================================================
+  // FEEDBACK & SUPPORT DELEGATES
+  // ===========================================================================
+
+  /// Submits user feedback or suggestions
+  Future<ApiResponse<Map<String, dynamic>>> submitFeedback({
+    required String message,
+    String? type,
+    String? contact,
+    String? token,
+    String? appVersion,
+    String? deviceInfo,
+  }) => _feedbackApi.submitFeedback(
+    message: message,
+    type: type,
+    contact: contact,
+    token: token,
+    appVersion: appVersion,
+    deviceInfo: deviceInfo,
   );
 
   // ===========================================================================

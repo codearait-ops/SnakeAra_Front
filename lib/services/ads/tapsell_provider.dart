@@ -4,7 +4,7 @@ import 'package:tapsell_plus/tapsell_plus.dart';
 import 'ad_config.dart';
 import 'ad_provider.dart';
 
-/// Provider for Tapsell Plus Rewarded Video Ads.
+/// Provider for Tapsell Plus Rewarded and Interstitial Video Ads.
 class TapsellProvider implements AdNetworkProvider {
   @override
   String get providerName => 'Tapsell Plus';
@@ -40,7 +40,7 @@ class TapsellProvider implements AdNetworkProvider {
             AdConfig.tapsellRequestTimeout,
             onTimeout: () {
               debugPrint(
-                '[TapsellProvider] Tapsell request timed out after ${AdConfig.tapsellRequestTimeout.inSeconds}s.',
+                '[TapsellProvider] Tapsell rewarded request timed out after ${AdConfig.tapsellRequestTimeout.inSeconds}s.',
               );
               return '';
             },
@@ -64,7 +64,8 @@ class TapsellProvider implements AdNetworkProvider {
       await TapsellPlus.instance.showRewardedVideoAd(
         responseId,
         onOpened: (map) {
-          debugPrint('[TapsellProvider] Tapsell ad opened: $map');
+          debugPrint('[TapsellProvider] Tapsell rewarded ad opened: $map');
+          onBeforeShow?.call();
         },
         onRewarded: (map) {
           debugPrint(
@@ -74,14 +75,16 @@ class TapsellProvider implements AdNetworkProvider {
         },
         onClosed: (map) {
           debugPrint(
-            '[TapsellProvider] Tapsell ad closed. Reward status: $earnedReward',
+            '[TapsellProvider] Tapsell rewarded ad closed. Reward status: $earnedReward',
           );
+          onBeforeShow?.call();
           if (!showCompleter.isCompleted) {
             showCompleter.complete(earnedReward);
           }
         },
         onError: (map) {
-          debugPrint('[TapsellProvider] Tapsell ad show error: $map');
+          debugPrint('[TapsellProvider] Tapsell rewarded ad show error: $map');
+          onBeforeShow?.call();
           if (!showCompleter.isCompleted) {
             showCompleter.complete(false);
           }
@@ -91,6 +94,68 @@ class TapsellProvider implements AdNetworkProvider {
       return await showCompleter.future;
     } catch (e) {
       debugPrint('[TapsellProvider] Exception showing Tapsell ad: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> showInterstitialAd({
+    required BuildContext context,
+    VoidCallback? onBeforeShow,
+  }) async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    debugPrint('[TapsellProvider] Requesting Tapsell Interstitial Video Ad...');
+    try {
+      final String responseId = await TapsellPlus.instance
+          .requestInterstitialAd(AdConfig.tapsellInterstitialZoneId)
+          .timeout(
+            AdConfig.tapsellRequestTimeout,
+            onTimeout: () {
+              debugPrint(
+                '[TapsellProvider] Tapsell interstitial request timed out after ${AdConfig.tapsellRequestTimeout.inSeconds}s.',
+              );
+              return '';
+            },
+          );
+
+      if (responseId.isEmpty) {
+        debugPrint('[TapsellProvider] No interstitial ad available or responseId was empty.');
+        return false;
+      }
+
+      debugPrint(
+        '[TapsellProvider] Tapsell interstitial ready with responseId: $responseId. Displaying...',
+      );
+
+      onBeforeShow?.call();
+
+      final Completer<bool> showCompleter = Completer<bool>();
+
+      await TapsellPlus.instance.showInterstitialAd(
+        responseId,
+        onOpened: (map) {
+          debugPrint('[TapsellProvider] Tapsell Interstitial opened: $map');
+        },
+        onClosed: (map) {
+          debugPrint('[TapsellProvider] Tapsell Interstitial closed.');
+          if (!showCompleter.isCompleted) {
+            showCompleter.complete(true);
+          }
+        },
+        onError: (map) {
+          debugPrint('[TapsellProvider] Tapsell Interstitial show error: $map');
+          if (!showCompleter.isCompleted) {
+            showCompleter.complete(false);
+          }
+        },
+      );
+
+      return await showCompleter.future;
+    } catch (e) {
+      debugPrint('[TapsellProvider] Exception showing Tapsell interstitial ad: $e');
       return false;
     }
   }

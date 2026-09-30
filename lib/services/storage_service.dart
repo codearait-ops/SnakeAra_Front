@@ -76,12 +76,28 @@ class StorageService extends GetxService {
     return !(_prefs.getBool('hide_mode_intro_$modeId') ?? false);
   }
 
-  /// Save the preference to hide or show mode intro dialog
+  /// Set whether to hide the mode intro dialog for a specific mode.
   Future<void> setHideModeIntro(String modeId, bool hide) async {
     await _prefs.setBool('hide_mode_intro_$modeId', hide);
   }
 
+  /// Key for tracking game entry count for interstitial ads
+  static const String _kGameEnterCounterKey = 'game_enter_ad_counter';
 
+  /// Get current game entry count.
+  int getGameEnterCount() => _prefs.getInt(_kGameEnterCounterKey) ?? 0;
+
+  /// Increment game entry count and return the new value.
+  Future<int> incrementGameEnterCount() async {
+    final next = getGameEnterCount() + 1;
+    await _prefs.setInt(_kGameEnterCounterKey, next);
+    return next;
+  }
+
+  /// Reset game entry count back to 0.
+  Future<void> resetGameEnterCount() async {
+    await _prefs.setInt(_kGameEnterCounterKey, 0);
+  }
 
   // --- Player XP & Level Persistence ---
 
@@ -116,26 +132,30 @@ class StorageService extends GetxService {
     return 0;
   }
 
-
-
   // --- Language / i18n Persistence ---
 
   String getLanguageCode() => _prefs.getString('app_language_code') ?? 'en';
-  Future<void> saveLanguageCode(String code) async => await _prefs.setString('app_language_code', code);
+  Future<void> saveLanguageCode(String code) async =>
+      await _prefs.setString('app_language_code', code);
 
   String getSelectedSkinId() => _prefs.getString('snake_skin') ?? 'neon_green';
-  Future<void> saveSelectedSkinId(String skinId) async => await _prefs.setString('snake_skin', skinId);
+  Future<void> saveSelectedSkinId(String skinId) async =>
+      await _prefs.setString('snake_skin', skinId);
 
-  String getSelectedBoardSkinId() => _prefs.getString('board_skin') ?? 'default';
-  Future<void> saveSelectedBoardSkinId(String skinId) async => await _prefs.setString('board_skin', skinId);
+  String getSelectedBoardSkinId() =>
+      _prefs.getString('board_skin') ?? 'default';
+  Future<void> saveSelectedBoardSkinId(String skinId) async =>
+      await _prefs.setString('board_skin', skinId);
 
   bool getShowJoystick() => _prefs.getBool('show_joystick') ?? true;
-  Future<void> saveShowJoystick(bool show) async => await _prefs.setBool('show_joystick', show);
+  Future<void> saveShowJoystick(bool show) async =>
+      await _prefs.setBool('show_joystick', show);
 
   // --- Auth & Profile Persistence ---
 
   String? getSavedUserId() => _prefs.getString(kUserIdKey);
-  Future<void> saveUserId(String userId) async => await _prefs.setString(kUserIdKey, userId);
+  Future<void> saveUserId(String userId) async =>
+      await _prefs.setString(kUserIdKey, userId);
 
   Future<String?> getUserToken() async {
     _cachedUserToken ??= await _secureStorage.read(key: kUserTokenKey);
@@ -148,13 +168,16 @@ class StorageService extends GetxService {
   }
 
   String? getSavedUsername() => _prefs.getString(kUsernameKey);
-  Future<void> saveUsername(String username) async => await _prefs.setString(kUsernameKey, username);
+  Future<void> saveUsername(String username) async =>
+      await _prefs.setString(kUsernameKey, username);
 
   String getSavedAvatarId() => _prefs.getString(kAvatarIdKey) ?? 'avatar_1';
-  Future<void> saveAvatarId(String avatarId) async => await _prefs.setString(kAvatarIdKey, avatarId);
+  Future<void> saveAvatarId(String avatarId) async =>
+      await _prefs.setString(kAvatarIdKey, avatarId);
 
   String? getCustomAvatarPath() => _prefs.getString('custom_avatar_path');
-  Future<void> saveCustomAvatarPath(String path) async => await _prefs.setString('custom_avatar_path', path);
+  Future<void> saveCustomAvatarPath(String path) async =>
+      await _prefs.setString('custom_avatar_path', path);
 
   // --- Daily Challenge Persistence ---
 

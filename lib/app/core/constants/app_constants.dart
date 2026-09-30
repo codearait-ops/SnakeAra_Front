@@ -20,7 +20,7 @@ const Color kObstacleBorderColor = Color(0xFF484F58);
 
 /// API Configuration
 const String kBaseUrl =
-    'http://snake.codeara.net/api'; // Server backend API URL
+    'https://snake.codeara.net/api'; // Server backend API URL
 const String kSecurityTokenPrefix = 'CodearaSecret';
 
 /// SharedPreferences keys

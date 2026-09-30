@@ -19,4 +19,15 @@ abstract class AdNetworkProvider {
     required BuildContext context,
     VoidCallback? onBeforeShow,
   });
+
+  /// Attempts to load and show an interstitial ad.
+  ///
+  /// [onBeforeShow] is executed right before presenting the ad to the user.
+  ///
+  /// Returns `true` if the ad was shown and closed normally.
+  /// Returns `false` if loading/showing failed.
+  Future<bool> showInterstitialAd({
+    required BuildContext context,
+    VoidCallback? onBeforeShow,
+  });
 }

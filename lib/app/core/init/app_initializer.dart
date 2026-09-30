@@ -47,6 +47,12 @@ abstract class AppInitializer {
     try {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('[Firebase] ⏱️ Firebase.initializeApp timed out (offline mode).');
+          return Firebase.app();
+        },
       );
       debugPrint('[Firebase] Initialized successfully');
     } catch (e) {
@@ -71,9 +77,27 @@ abstract class AppInitializer {
       () => SoundService().init(),
       permanent: true,
     );
-    await Get.putAsync<NotificationService>(
-      () => NotificationService().init(),
-      permanent: true,
-    );
+    try {
+      await Get.putAsync<NotificationService>(
+        () => NotificationService().init(),
+        permanent: true,
+      ).timeout(
+        const Duration(seconds: 2),
+        onTimeout: () {
+          debugPrint(
+            '⚠️ [AppInitializer] NotificationService init timed out, proceeding.',
+          );
+          if (!Get.isRegistered<NotificationService>()) {
+            Get.put<NotificationService>(NotificationService(), permanent: true);
+          }
+          return Get.find<NotificationService>();
+        },
+      );
+    } catch (e) {
+      debugPrint('⚠️ [AppInitializer] NotificationService init error: $e');
+      if (!Get.isRegistered<NotificationService>()) {
+        Get.put<NotificationService>(NotificationService(), permanent: true);
+      }
+    }
   }
 }
