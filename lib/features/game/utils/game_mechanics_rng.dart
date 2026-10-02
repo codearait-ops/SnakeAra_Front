@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 
 /// Provides distinct RNG streams for deterministic gameplay sequences.
 /// 
@@ -20,9 +21,9 @@ class GameMechanicsRng {
         boss = seed != null ? Random(seed + 4000) : null,
         level = seed != null ? Random(seed + 5000) : null {
     if (seed == null) {
-      print('[GameMechanicsRng] WARNING: Initialized without a seed. RNG will not be deterministic.');
+      debugPrint('[GameMechanicsRng] WARNING: Initialized without a seed. RNG will not be deterministic.');
     } else {
-      print('[GameMechanicsRng] Initialized with strict deterministic seed: $seed');
+      debugPrint('[GameMechanicsRng] Initialized with strict deterministic seed: $seed');
     }
   }
 }

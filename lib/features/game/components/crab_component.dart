@@ -1,8 +1,8 @@
 import 'dart:math';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flame/game.dart';
 import 'package:flame/components.dart';
-import 'package:flame/sprite.dart';
 import '../../../app/core/utils/enums.dart';
 import 'snake_component.dart';
 
@@ -55,8 +55,6 @@ class CrabComponent {
   late Sprite _jawSprite;
   late Sprite _leg1Sprite;
   late Sprite _leg2Sprite;
-  late Sprite _leg3Sprite;
-  late Sprite _leg4Sprite;
 
   Future<void> loadAssets(FlameGame game) async {
     try {
@@ -68,13 +66,11 @@ class CrabComponent {
       _jawSprite = Sprite(await game.images.load('Parts/crab_jaw.png'));
       _leg1Sprite = Sprite(await game.images.load('Parts/crab_leg1.png'));
       _leg2Sprite = Sprite(await game.images.load('Parts/crab_leg2.png'));
-      // _leg3Sprite = Sprite(await game.images.load('Parts/crab_leg3.png'));
-      // _leg4Sprite = Sprite(await game.images.load('Parts/crab_leg4.png'));
 
       game.images.prefix = oldPrefix;
       _isLoaded = true;
     } catch (e) {
-      print('CrabComponent asset load failed: $e');
+      debugPrint('CrabComponent asset load failed: $e');
     }
   }
 

@@ -9,7 +9,7 @@ import '../../../app/core/constants/app_constants.dart';
 import '../../../app/core/utils/enums.dart';
 import '../services/game_sound_dispatcher.dart';
 import '../../../services/storage_service.dart';
-import '../../../services/api_service.dart';
+import '../../../services/models/api_responses.dart';
 import '../../../services/game_event_logger.dart';
 import '../../auth/controllers/auth_controller.dart';
 import '../../daily_mission/controllers/daily_mission_controller.dart';
@@ -93,13 +93,10 @@ class SnakeGame extends FlameGame {
   // --- Strategy Pattern Mode Handler ---
   BaseGameModeHandler? _modeHandler;
 
-  int get appleTarget => _appleTarget;
+  int get appleTarget => appleTargetRx.value;
   void triggerLevelComplete() => _levelComplete();
   void triggerGameOver(GameOverReason reason) => _gameOver(reason);
   void triggerSnakeSliced(List<GridPos> cutSegments) => _onSnakeSliced(cutSegments);
-
-  int get speed => _speed;
-  set speed(int value) => _speed = value;
 
   void triggerEatEffect() => _playEatEffect();
   void triggerShake() => _triggerShake();
@@ -111,7 +108,7 @@ class SnakeGame extends FlameGame {
       Get.find<GameEventLogger>().logEvent('pear_eaten', {
         'bonus_awarded': bonusScore,
         'current_score': score.value,
-        'speed_ms': _speed,
+        'speed_ms': speed,
         'snake_length': snake.segments.length,
       });
     }
@@ -153,8 +150,8 @@ class SnakeGame extends FlameGame {
         'current_score': score.value,
         'is_rain_apple': true,
         'speed_ms': (casualPowerUp.isTurboActive
-            ? (_speed / CasualModeConfig.turboSpeedMultiplier).round()
-            : _speed),
+            ? (speed / CasualModeConfig.turboSpeedMultiplier).round()
+            : speed),
         'snake_length': snake.segments.length,
         'streak': streak,
         'active_powerup': 'appleRain',
@@ -371,15 +368,13 @@ class SnakeGame extends FlameGame {
   // --- Level & Game state ---
   bool isIntroWaiting = false;
   int currentLevel = 1;
-  int _speed = 400; // ms between moves
-  int _timeLimit = 120; // seconds
-  int _appleTarget = kAppleTarget;
+  int speed = 400; // ms between moves
   int applesEaten = 0;
   int _elapsedTime = 0;
 
   /// Effective movement interval in seconds, taking active speed modifiers into account.
   double get _effectiveMoveInterval {
-    double spd = _speed.toDouble();
+    double spd = speed.toDouble();
     if (_modeHandler != null) {
       spd = _modeHandler!.modifySpeed(spd);
     }
@@ -650,7 +645,7 @@ class SnakeGame extends FlameGame {
     showLevelComplete.value = false;
     _inputQueue.clear();
 
-    _speed = 220; // initial speed in ms
+    speed = 220; // initial speed in ms
     obstacles.loadFromLevelData([]); // No obstacles
     pear.despawn();
     pearsCount.value = 0;
@@ -692,7 +687,7 @@ class SnakeGame extends FlameGame {
     showLevelComplete.value = false;
     _inputQueue.clear();
 
-    _speed = 210; // Comfortable base speed in ms
+    speed = 210; // Comfortable base speed in ms
     obstacles.loadFromLevelData([]); // No obstacles
     pear.despawn();
     pearsCount.value = 0;
@@ -765,7 +760,7 @@ class SnakeGame extends FlameGame {
     showLevelComplete.value = false;
     _inputQueue.clear();
 
-    _speed = 190; // initial speed in ms
+    speed = 190; // initial speed in ms
     obstacles.loadFromLevelData([]); // No obstacles
     pear.despawn();
     pearsCount.value = 0;
@@ -807,7 +802,7 @@ class SnakeGame extends FlameGame {
     showLevelComplete.value = false;
     _inputQueue.clear();
 
-    _speed = 190; // ms between moves
+    speed = 190; // ms between moves
     obstacles.loadFromLevelData([]);
     pear.despawn();
     pearsCount.value = 0;
@@ -850,7 +845,7 @@ class SnakeGame extends FlameGame {
     showLevelComplete.value = false;
     _inputQueue.clear();
 
-    _speed = 220; // Initial speed
+    speed = 220; // Initial speed
     obstacles.loadFromLevelData([]); // Clear obstacles
     pear.despawn();
     pearsCount.value = 0;
@@ -892,7 +887,7 @@ class SnakeGame extends FlameGame {
     showLevelComplete.value = false;
     _inputQueue.clear();
 
-    _speed = 200; // Normal starting speed
+    speed = 200; // Normal starting speed
 
     obstacles.loadFromLevelData([]); // No initial obstacles unless desired
     pear.despawn();
@@ -937,7 +932,7 @@ class SnakeGame extends FlameGame {
     showLevelComplete.value = false;
     _inputQueue.clear();
 
-    _speed = 190; // initial speed in ms
+    speed = 190; // initial speed in ms
     obstacles.loadFromLevelData([]); // Clear obstacles
     pear.despawn();
     pearsCount.value = 0;
@@ -1030,12 +1025,11 @@ class SnakeGame extends FlameGame {
       (l) => l['level'] == level,
       orElse: () => gameLevels[0],
     );
-    _speed = ((levelData['speed'] as int) * 0.5).round();
-    _timeLimit = levelData['timeLimit'] as int;
-    _appleTarget = levelData['appleTarget'] as int;
-    appleTargetRx.value = _appleTarget;
-    _timeRemaining = _timeLimit;
-    timeRemaining.value = _timeLimit;
+    speed = ((levelData['speed'] as int) * 0.5).round();
+    final timeLimit = levelData['timeLimit'] as int;
+    appleTargetRx.value = levelData['appleTarget'] as int;
+    _timeRemaining = timeLimit;
+    timeRemaining.value = timeLimit;
     pear.despawn();
 
     // Reset boss reactive state
@@ -1174,7 +1168,7 @@ class SnakeGame extends FlameGame {
       Get.find<GameEventLogger>().logEvent('food_eaten', {
         'score_awarded': scoreAwarded,
         'current_score': score.value,
-        'speed_ms': _speed,
+        'speed_ms': speed,
         'snake_length': snake.segments.length,
       });
     } else if (gameMode.value == GameMode.blindMemory) {
@@ -1182,7 +1176,7 @@ class SnakeGame extends FlameGame {
         'score_awarded': scoreAwarded,
         'current_score': score.value,
         'is_flash_active': isFlashActive.value,
-        'speed_ms': _speed,
+        'speed_ms': speed,
         'snake_length': snake.segments.length,
       });
     } else if (gameMode.value == GameMode.laser) {
@@ -1191,14 +1185,14 @@ class SnakeGame extends FlameGame {
         'current_score': score.value,
         'active_lasers':
             (activeLaserRow.value >= 0 || activeLaserCol.value >= 0) ? 1 : 0,
-        'speed_ms': _speed,
+        'speed_ms': speed,
         'snake_length': snake.segments.length,
       });
     } else if (gameMode.value == GameMode.crabChase) {
       Get.find<GameEventLogger>().logEvent('food_eaten', {
         'score_awarded': scoreAwarded,
         'current_score': score.value,
-        'speed_ms': _speed,
+        'speed_ms': speed,
         'snake_length': snake.segments.length,
       });
     } else if (gameMode.value == GameMode.casual) {
@@ -1209,8 +1203,8 @@ class SnakeGame extends FlameGame {
         'score_awarded': scoreAwarded,
         'current_score': score.value,
         'speed_ms': (casualPowerUp.isTurboActive
-            ? (_speed / CasualModeConfig.turboSpeedMultiplier).round()
-            : _speed),
+            ? (speed / CasualModeConfig.turboSpeedMultiplier).round()
+            : speed),
         'snake_length': snake.segments.length,
         'streak': streak,
         'active_powerup': casualPowerUp.activePowerUp?.name,
@@ -1220,15 +1214,11 @@ class SnakeGame extends FlameGame {
     _playEatEffect();
 
     if (gameMode.value == GameMode.infection) {
-      // Eating an apple strictly heals 1 single infected segment
-      snake.healInfection(1);
-      infectionRatio.value = snake.infectionRatio;
-
       Get.find<GameEventLogger>().logEvent('food_eaten', {
         'score_awarded': scoreAwarded,
         'current_score': score.value,
         'infection_ratio': snake.infectionRatio,
-        'speed_ms': _speed,
+        'speed_ms': speed,
         'snake_length': snake.segments.length,
       });
 
@@ -1248,7 +1238,7 @@ class SnakeGame extends FlameGame {
           meltdownAppleTimer.toStringAsFixed(2),
         ),
         'bonus_awarded': bonusAwarded,
-        'speed_ms': _speed,
+        'speed_ms': speed,
         'snake_length': snake.segments.length,
       });
     }
@@ -1500,8 +1490,9 @@ class SnakeGame extends FlameGame {
   /// Play or resume the appropriate BGM for the active game mode.
   void playModeBgm() {
     if (gameStatus.value != GameStatus.playing &&
-        gameStatus.value != GameStatus.paused)
+        gameStatus.value != GameStatus.paused) {
       return;
+    }
     _soundDispatcher.playBgmForMode(gameMode.value);
   }
 

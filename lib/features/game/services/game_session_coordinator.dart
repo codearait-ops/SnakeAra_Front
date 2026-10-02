@@ -6,7 +6,6 @@ import 'package:snake_game/features/auth/controllers/game_session_controller.dar
 import 'package:snake_game/features/daily_mission/controllers/daily_mission_controller.dart';
 import 'package:snake_game/features/levels/controllers/level_controller.dart';
 import 'package:snake_game/features/wallet/controllers/wallet_controller.dart';
-import 'package:snake_game/features/leaderboard/models/league_leaderboard_entry.dart';
 import 'package:snake_game/features/game/widgets/level_up_dialog.dart';
 import 'package:snake_game/services/api_service.dart';
 import 'package:snake_game/services/game_event_logger.dart';
@@ -265,7 +264,7 @@ class GameSessionCoordinator {
         final int rawStat = (mType == 'survive_time')
             ? elapsedTimeSec
             : (mType == 'eat_count' ? applesEaten : submitValue);
-        final effectiveId = (dailyMissionId != null && dailyMissionId! > 0)
+        final effectiveId = (dailyMissionId != null && dailyMissionId > 0)
             ? dailyMissionId
             : missionController.currentMission.value?.id;
 

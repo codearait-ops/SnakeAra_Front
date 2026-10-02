@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'package:flutter/material.dart' show Color, PaintingStyle, StrokeCap, MaskFilter, BlurStyle;
 import 'package:snake_game/app/core/constants/app_constants.dart';
 
 /// Centralized static, reusable [Paint] allocations for SnakeGame and its sub-renderers.

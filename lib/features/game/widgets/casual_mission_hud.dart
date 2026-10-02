@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/game_controller.dart';
-import '../models/casual_mode_models.dart';
 
 /// Top overlay HUD widget displaying active Casual Mission, progress bar,
 /// active power-up timer badge, and mission cooldown countdown.

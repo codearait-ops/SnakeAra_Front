@@ -14,7 +14,7 @@ class GameSoundDispatcher {
   /// Underlying SoundService instance.
   SoundService get sound =>
       _soundService ??= (_soundServiceResolver != null
-          ? _soundServiceResolver!()
+          ? _soundServiceResolver()
           : Get.find<SoundService>());
 
   // --- Background Music ---
